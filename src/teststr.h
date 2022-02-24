@@ -1,0 +1,9 @@
+static const char* w6  = "aaaaaa";
+static const char* w7  = "aaaaaaa";
+static const char* w8  = "aaaaaaaa";
+static const char* w13 = "aaaaaaaaaaaaa";
+static const char* w14 = "aaaaaaaaaaaaaa";
+static const char* w15 = "aaaaaaaaaaaaaaa";
+static const char* w16 = "aaaaaaaaaaaaaaaa";
+static const char* w17 = "aaaaaaaaaaaaaaaaa";
+static const char* w32 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
