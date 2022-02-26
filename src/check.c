@@ -6,9 +6,7 @@
 #include <errno.h>
 #include <stdarg.h>
 
-#include "buf.h"
-#include "util.c"
-#include "teststr.h"
+#include "buffet.h"
 
 #define assert_int(a, b) { if ((int)(a) != (int)(b)) { \
 fprintf(stderr, "%d: %s:%d != %s:%d\n", __LINE__, #a, (int)a, #b, (int)b); \
@@ -23,24 +21,34 @@ fprintf(stderr, "%d: %s:'%s' != %s:'%s'\n", __LINE__, #a, a, #b, b); \
 exit(EXIT_FAILURE);}}
 
 #define assert_buf(b, cap, len, str) \
-    assert_int (buf_cap(b), cap);\
-    assert_int (buf_len(b), len);\
-    assert_str (buf_cstr(b), str);
+    assert_int (bft_cap(b), cap);\
+    assert_int (bft_len(b), len);\
+    assert_str (bft_cstr(b), str);
 
 const char* foo = "foo";
 const size_t foolen = 3;
 const char alpha[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const size_t alphalen = strlen(alpha);
 
+static const char* w6  = "aaaaaa";
+static const char* w7  = "aaaaaaa";
+static const char* w8  = "aaaaaaaa";
+static const char* w13 = "aaaaaaaaaaaaa";
+static const char* w14 = "aaaaaaaaaaaaaa";
+static const char* w15 = "aaaaaaaaaaaaaaa";
+static const char* w16 = "aaaaaaaaaaaaaaaa";
+static const char* w17 = "aaaaaaaaaaaaaaaaa";
+static const char* w32 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
 //==============================================================================
 static void u_new (size_t cap) 
 {
-    Buf b; 
-    buf_new (&b, cap);     
-    assert_int (buf_len(&b), 0);
-    assert_str (buf_data(&b), "");
-    assert_str (buf_cstr(&b), "");
-    buf_free(&b); 
+    Buffet b; 
+    bft_new (&b, cap);     
+    assert_int (bft_len(&b), 0);
+    assert_str (bft_data(&b), "");
+    assert_str (bft_cstr(&b), "");
+    bft_free(&b); 
 }
 
 static void new() 
@@ -58,12 +66,12 @@ static void new()
 //==============================================================================
 static void u_copy_str (const char* src, size_t srclen, const char* expstr)
 {
-    Buf b;
-    buf_copy_str (&b, src, srclen);
-    assert_int (buf_len(&b), srclen);
-    assert_str (buf_data(&b), expstr);
-    assert_str (buf_cstr(&b), expstr);
-    buf_free(&b);
+    Buffet b;
+    bft_strcopy (&b, src, srclen);
+    assert_int (bft_len(&b), srclen);
+    assert_str (bft_data(&b), expstr);
+    assert_str (bft_cstr(&b), expstr);
+    bft_free(&b);
 }
 
 void copy_str() 
@@ -84,14 +92,14 @@ void copy_str()
 
 static void u_view_str (const char* src, size_t srclen, const char* expstr)
 {
-    Buf b;
-    buf_view_str (&b, src, srclen);
-    assert_int (buf_len(&b), srclen); //buf_dbg(&b);
-    char* out = buf_export(&b);
+    Buffet b;
+    bft_strview (&b, src, srclen);
+    assert_int (bft_len(&b), srclen); //bft_dbg(&b);
+    char* out = bft_export(&b);
     assert_str (out, expstr);
-    // assert_str (buf_cstr(&b), expstr);
+    // assert_str (bft_cstr(&b), expstr);
     free(out);
-    buf_free(&b);
+    bft_free(&b);
 }
 
 void view_str() 
@@ -112,13 +120,13 @@ void view_str()
 static void 
 u_slice (const char* src, size_t off, size_t len, const char* expstr)
 {
-    Buf b;
-    buf_copy_str (&b, src, strlen(src));
-    Buf v = buf_slice(&b, off, len);
-    assert_int (buf_len(&v), len);
-    assert_str (buf_cstr(&v), expstr);
-    buf_free(&v);
-    buf_free(&b);
+    Buffet b;
+    bft_strcopy (&b, src, strlen(src));
+    Buffet v = bft_slice(&b, off, len);
+    assert_int (bft_len(&v), len);
+    assert_str (bft_cstr(&v), expstr);
+    bft_free(&v);
+    bft_free(&b);
 }
 
 void slice()
@@ -139,43 +147,52 @@ void slice()
 static void 
 u_view (size_t srclen, size_t off, size_t len)
 {
-    Buf b;
-    buf_copy_str (&b, alpha, srclen);
-    Buf v = buf_view (&b, off, len);
-    assert_int (buf_len(&v), len);
-    assert_strncmp (buf_data(&v), alpha+off, len);
-    buf_free(&v);
-    buf_free(&b);
+    Buffet b;
+    bft_strcopy (&b, alpha, srclen);
+    Buffet v = bft_view (&b, off, len);
+    assert_int (bft_len(&v), len);
+    assert_strncmp (bft_data(&v), alpha+off, len);
+    bft_free(&v);
+    bft_free(&b);
 }
 
 static void 
 u_view_ref (size_t off, size_t len)
 {
-    Buf b;
-    buf_copy_str (&b, alpha, alphalen);
-    Buf bv = buf_view (&b, 0, alphalen);
-    Buf v = buf_view (&bv, off, len);
-    assert_int (buf_len(&v), len);
-    assert_strncmp (buf_data(&v), alpha+off, len);
-    buf_free(&bv);
-    buf_free(&v);
-    buf_free(&b);
+    Buffet b;
+    bft_strcopy (&b, alpha, alphalen);
+    Buffet bv = bft_view (&b, 0, alphalen);
+    Buffet v = bft_view (&bv, off, len);
+    assert_int (bft_len(&v), len);
+    assert_strncmp (bft_data(&v), alpha+off, len);
+    bft_free(&bv);
+    bft_free(&v);
+    bft_free(&b);
 }
 
 static void 
 u_view_strref (size_t off, size_t len)
 {
-    Buf b;
-    buf_view_str (&b, alpha, alphalen);
-    Buf v = buf_view (&b, off, len);
-    assert_int (buf_len(&v), len);
-    assert_strncmp (buf_data(&v), alpha+off, len);
-    buf_free(&v);
-    buf_free(&b);
+    Buffet b;
+    bft_strview (&b, alpha, alphalen);
+    Buffet v = bft_view (&b, off, len);
+    assert_int (bft_len(&v), len);
+    assert_strncmp (bft_data(&v), alpha+off, len);
+    bft_free(&v);
+    bft_free(&b);
+}
+
+Buffet create(size_t len){
+    Buffet a;
+    bft_strcopy(&a, alpha, len);
+    Buffet b = bft_view(&a, 4, 4);
+    return b;
 }
 
 void view()
 {
+    // Buffet b = create(8);
+    // bft_dbg(&b);
     // on SSO
     u_view (8, 0, 0);
     u_view (8, 0, 4);
@@ -201,47 +218,47 @@ void view()
 //==============================================================================
 void u_append_new (size_t cap, size_t len)
 {
-    Buf b;
-    buf_new (&b, cap);
-    buf_append (&b, alpha, len);
-    assert_int (buf_len(&b), len);
-    assert_strncmp (buf_data(&b), alpha, len);
-    buf_free(&b);    
+    Buffet b;
+    bft_new (&b, cap);
+    bft_append (&b, alpha, len);
+    assert_int (bft_len(&b), len);
+    assert_strncmp (bft_data(&b), alpha, len);
+    bft_free(&b);    
 }
 
 void u_append_copystr (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buf b;
-    buf_copy_str (&b, alpha, initlen);
-    buf_append (&b, alpha+initlen, len);
-    assert_int (buf_len(&b), totlen);
-    assert_strncmp (buf_data(&b), alpha, totlen);
-    buf_free(&b);    
+    Buffet b;
+    bft_strcopy (&b, alpha, initlen);
+    bft_append (&b, alpha+initlen, len);
+    assert_int (bft_len(&b), totlen);
+    assert_strncmp (bft_data(&b), alpha, totlen);
+    bft_free(&b);    
 }
 
 void u_append_viewstr (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buf b;
-    buf_view_str (&b, alpha, initlen);
-    buf_append (&b, alpha+initlen, len);
-    assert_int (buf_len(&b), totlen);
-    assert_strncmp (buf_data(&b), alpha, totlen);
-    buf_free(&b);    
+    Buffet b;
+    bft_strview (&b, alpha, initlen);
+    bft_append (&b, alpha+initlen, len);
+    assert_int (bft_len(&b), totlen);
+    assert_strncmp (bft_data(&b), alpha, totlen);
+    bft_free(&b);    
 }
 
 void u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buf b;
-    buf_copy_str (&b, alpha, initlen);
-    Buf v = buf_view (&b, 0, initlen);
-    buf_append (&v, alpha+initlen, len);
-    assert_int (buf_len(&v), totlen);
-    assert_strncmp (buf_data(&v), alpha, totlen);
-    buf_free(&v); 
-    buf_free(&b);    
+    Buffet b;
+    bft_strcopy (&b, alpha, initlen);
+    Buffet v = bft_view (&b, 0, initlen);
+    bft_append (&v, alpha+initlen, len);
+    assert_int (bft_len(&v), totlen);
+    assert_strncmp (bft_data(&v), alpha, totlen);
+    bft_free(&v); 
+    bft_free(&b);    
 }
 
 void append()
@@ -281,23 +298,23 @@ void append()
 void export()
 {
     #define EXP_NEW(cap) {\
-        Buf b;\
-        buf_new(&b, cap);\
-        char* out = buf_export(&b);\
+        Buffet b;\
+        bft_new(&b, cap);\
+        char* out = bft_export(&b);\
         assert_str(out, "");\
         free(out);\
-        buf_free(&b);\
+        bft_free(&b);\
     }
     EXP_NEW(10);
     EXP_NEW(100);
 
    #define EXP_STRCPY(len) {\
-        Buf b;\
-        buf_copy_str(&b, alpha, len);\
-        char* out = buf_export(&b);\
+        Buffet b;\
+        bft_strcopy(&b, alpha, len);\
+        char* out = bft_export(&b);\
         assert (!strncmp(out, alpha, len));\
         free(out);\
-        buf_free(&b);\
+        bft_free(&b);\
     }
     EXP_STRCPY(10);
     EXP_STRCPY(alphalen);

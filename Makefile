@@ -1,35 +1,29 @@
 CC = gcc
 STD = c11
-OPTIM = -O0
+OPTIM = -O2
 WARN = -Wall -Wextra -Wno-unused-function -Wno-unused-variable 
-CP = $(CC) -std=$(STD) $(OPTIM) $(WARN) -g #-pg
-COMP = $(CP) -c $< -o $@
+CP = $(CC) -std=$(STD) $(OPTIM) $(WARN) -g
 LINK = $(CP) $^ -o $@
 
 $(shell mkdir -p bin)
 
-lib = bin/rocket
+lib = bin/buffet
 check = bin/check
-test = bin/test
 
-all: $(lib) $(test) $(check)
+all: $(lib) $(check)
 	
-$(lib): src/buf.c src/buf.h #src/util.c
+$(lib): src/buffet.c src/buffet.h
 	@ echo $@
-	@ $(COMP)
+	@ $(CP) -c $< -o $@
 
-$(check): src/check.c $(lib) src/util.c
+$(check): src/check.c $(lib)
 	@ echo $@
-	@ $(CP) $< $(lib) -o $@
-
-$(test): src/test.c $(lib) #util.c
-	@ echo $@	
 	@ $(CP) $< $(lib) -o $@
 
 check:
 	@ ./$(check)
 
 clean:
-	@ rm -f bin/* test
+	@ rm -f bin/*
 
-.PHONY: all check test clean
+.PHONY: all check clean

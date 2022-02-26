@@ -1,47 +1,48 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <assert.h>
 
-#include "buf.h"
-#include "util.c"
+#include "buffet.h"
 #include "log.h"
 
-static_assert (sizeof(Buf)==BUF_SIZE, "Buf size");
+static_assert (sizeof(Buffet)==BFT_SIZE, "Buffet size");
 
 typedef enum {
 	SSO = 0,
-	PTR,
+	OWN,
 	REF,
-	STRVIEW
+	VUE
 } Type;
 
 
-#define ASDATA(data) ((intptr_t)(data) >> TYPE_BITS)
-#define DATA(buf) ((intptr_t)((buf)->data) << TYPE_BITS)
-#define SRC(view) ((Buf*)(DATA(view)))
-#define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<TYPE_BITS));
-
-static const Buf zero = (Buf){.fill={0}};
+#define ASDATA(ptr) ((intptr_t)(ptr) >> BFT_TYPE_BITS)
+#define DATA(buf) ((intptr_t)((buf)->data) << BFT_TYPE_BITS)
+#define SRC(view) ((Buffet*)(DATA(view)))
+#define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<BFT_TYPE_BITS));
+#define ZERO ((Buffet){.fill={0}})
 
 //==============================================================================
 
+static unsigned int 
+nextlog2 (unsigned long long n) {
+	return 8 * sizeof(unsigned long long) - __builtin_clzll(n-1);
+}
+
+
 static char*
-getdata (const Buf *b, const Type t) 
+getdata (const Buffet *b, const Type t) 
 {
 	switch(t) {
 		case SSO:
 			return (char*)b->sso;
-		case PTR:
+		case OWN:
 			return (char*)DATA(b);
-		case STRVIEW:
+		case VUE:
 			return (char*)(DATA(b) + b->off);
 		case REF: {
-			Buf* ref = SRC(b);
+			Buffet* ref = SRC(b);
 			return (char*)DATA(ref) + b->off;
 		}
 	}
@@ -50,43 +51,43 @@ getdata (const Buf *b, const Type t)
 
 
 static size_t
-getcap (const Buf *b, Type t) {
+getcap (const Buffet *b, Type t) {
 	return 
-		t == PTR ? (1ull << b->cap)
-	:	t == SSO ? SSO_CAP
+		t == OWN ? (1ull << b->cap)
+	:	t == SSO ? BFT_SSO_CAP
 	: 	0;
 }
 
 
 // optim (!t)*ssolen + (!!t)*len
 static size_t
-getlen (const Buf *b, Type t) {
+getlen (const Buffet *b, Type t) {
 	return (t == SSO) ? b->ssolen : b->len;
 }
 
 
 static void 
-setlen (Buf* b, Type t, size_t len) {
+setlen (Buffet* b, Type t, size_t len) {
 	if (t==SSO) b->ssolen=len; else b->len=len;
 }
 
 
 static char*
-reserve (Buf* dst, size_t cap)
+alloc (Buffet* dst, size_t cap)
 {
 	const uint8_t caplog = nextlog2(cap+1);
 	const size_t mem = 1ull << caplog;
 	char* data = malloc(mem); 
 	
-	data[0] = 0;
-	data[mem-1] = 0;
-	
 	assert_aligned(data);
-	*dst = (Buf){
+	// data[0] = 0;
+	// data[mem-1] = 0;
+	
+	*dst = (Buffet){
 		.data = ASDATA(data),
 		.cap = caplog,
-		.len = 0,
-		.type = PTR
+		// .len = 0,
+		.type = OWN
 	};
 
 	return data;
@@ -95,76 +96,72 @@ reserve (Buf* dst, size_t cap)
 //==============================================================================
 
 void
-buf_new (Buf* dst, size_t cap)
+bft_new (Buffet* dst, size_t cap)
 {
-	if (cap <= SSO_CAP) {
-		*dst = zero; 
-	} else {
-		reserve(dst, cap);
+	*dst = ZERO;
+
+	if (cap > BFT_SSO_CAP) {
+		char* data = alloc(dst, cap);
+		data[0] = 0;
 	}
 }
 
 
 void
-buf_copy_str (Buf* dst, const char* src, size_t srclen)
+bft_strcopy (Buffet* dst, const char* src, size_t len)
 {
-	if (srclen <= SSO_CAP) {
+	if (len <= BFT_SSO_CAP) {
 
-		*dst = zero;
-		memcpy(dst->sso, src, srclen);
-		dst->ssolen = srclen;
+		*dst = ZERO;
+		memcpy(dst->sso, src, len);
+		dst->ssolen = len;
 	
 	} else {
 	
-		char* data = reserve(dst, srclen);
-		memcpy(data, src, srclen);
-		data[srclen] = 0;
-		dst->len = srclen;
+		char* data = alloc(dst, len);
+		memcpy(data, src, len);
+		data[len] = 0;
+		dst->len = len;
 	}
 }
 
 
 void
-buf_view_str (Buf* dst, const char* src, size_t len)
+bft_strview (Buffet* dst, const char* src, size_t len)
 {
-	// in case src not aligned to TYPE_BITS,
-	// save remainder to be re-added when accessing view.data
-	uint8_t off = (intptr_t)src % (1 << TYPE_BITS);
-
-	*dst = zero;
+	// save remainder before src address is shifted.
+	dst->off = (intptr_t)src % (1 << BFT_TYPE_BITS);
 	dst->data = ASDATA(src);
-	dst->off = off;
 	dst->len = len;
-	dst->type = STRVIEW;
+	dst->type = VUE;
 }
 
 
-// COPY
-Buf
-buf_slice (Buf *src, size_t off, size_t len)
+Buffet
+bft_slice (Buffet *src, size_t off, size_t len)
 {
-	Buf ret;
+	Buffet ret;
 	const char* data = getdata(src, src->type);
-	buf_copy_str (&ret, data+off, len);
+	bft_strcopy (&ret, data+off, len);
 	return ret;
 }
 
 
-Buf
-buf_view (Buf *src, size_t off, size_t len)
+Buffet
+bft_view (Buffet *src, size_t off, size_t len)
 {
 	const Type type = src->type;
-	Buf ret = zero;
+	Buffet ret = ZERO;
 	
 	switch(type) {
 		
 		case SSO:
-		case STRVIEW: {
+		case VUE: {
 			char* data = getdata(src, type); 
-			buf_view_str (&ret, data + off, len); }
+			bft_strview (&ret, data + off, len); }
 			break;
 		
-		case PTR:
+		case OWN:
 			assert_aligned(src);
 			ret.data = ASDATA(src);
 			ret.off = off;
@@ -174,8 +171,8 @@ buf_view (Buf *src, size_t off, size_t len)
 			break;
 		
 		case REF: {
-			Buf* ref = SRC(src);
-			ret = buf_view (ref, src->off + off, len); }
+			Buffet* ref = SRC(src);
+			ret = bft_view (ref, src->off + off, len); }
 			break;
 	}
 
@@ -184,26 +181,26 @@ buf_view (Buf *src, size_t off, size_t len)
 
 
 void
-buf_free (Buf* buf)
+bft_free (Buffet* buf)
 {
 	const Type type = buf->type;
 
-	if (type == PTR && !buf->refcnt) {
+	if (type == OWN && !buf->refcnt) {
 
 		free((char*)DATA(buf));
 	
 	} else if (type == REF) {
 	
-		Buf* ref = SRC(buf);
+		Buffet* ref = SRC(buf);
 		--ref->refcnt;
 	}
 
-	*buf = zero;
+	*buf = ZERO;
 }
 
 
 size_t 
-buf_append (Buf *buf, const char* src, size_t srclen) 
+bft_append (Buffet *buf, const char* src, size_t srclen) 
 {
 	const Type type = buf->type;
 	char* data = getdata(buf, type); //LOGVS(data);
@@ -218,18 +215,18 @@ buf_append (Buf *buf, const char* src, size_t srclen)
 		newcaplog = nextlog2(newlen+1);
 		const size_t newcap = 1ull << newcaplog;
 
-		if (type == PTR) {
+		if (type == OWN) {
 			newdata = realloc(data, newcap);
 		} else {
 			newdata = malloc(newcap);
 			memcpy (newdata, data, len);
 			
 			if (type == REF) {
-				Buf* ref = SRC(buf);
+				Buffet* ref = SRC(buf);
 				--ref->refcnt;
 			}
 
-			buf->type = PTR;
+			buf->type = OWN; // or SSO ?
 			buf->refcnt = 0;
 		}
 
@@ -254,7 +251,7 @@ buf_append (Buf *buf, const char* src, size_t srclen)
 
 
 const char*
-buf_cstr (const Buf* buf) 
+bft_cstr (const Buffet* buf) 
 {
 	const Type type = buf->type;
 
@@ -263,18 +260,18 @@ buf_cstr (const Buf* buf)
 		case SSO:
 			return (const char*)buf->sso;
 		
-		case PTR:
+		case OWN:
 			return (const char*)DATA(buf);
 		
 		case REF: {
 			const size_t len = buf->len;
-			Buf *ref = SRC(buf);
+			Buffet *ref = SRC(buf);
 			char* cpy = malloc(len+1);
 			memcpy(cpy, (char*)DATA(ref)+buf->off, len);
 			cpy[len] = 0;
 			return (const char*)cpy; }
 		
-		case STRVIEW:
+		case VUE:
 			return NULL;
 	}
 
@@ -283,7 +280,7 @@ buf_cstr (const Buf* buf)
 
 
 char*
-buf_export (const Buf* buf) 
+bft_export (const Buffet* buf) 
 {
 	const Type type = buf->type;
 	char* data = getdata(buf, type);
@@ -297,22 +294,22 @@ buf_export (const Buf* buf)
 }
 
 char*
-buf_data(const Buf* buf) {
+bft_data(const Buffet* buf) {
 	return getdata(buf, buf->type);
 }
 
 size_t
-buf_cap(const Buf* buf) {
+bft_cap(const Buffet* buf) {
 	return getcap(buf, buf->type);
 }
 
 size_t
-buf_len(const Buf* buf) {
+bft_len(const Buffet* buf) {
 	return getlen(buf, buf->type);
 }
 
-void buf_dbg(Buf* b)
+void bft_dbg(Buffet* b)
 {
-    printf ("type %d cap %zu len %zu data '%s'\n", 
-        b->type, buf_cap(b), buf_len(b), buf_data(b));
+	printf ("type %d cap %zu len %zu data '%s'\n", 
+		b->type, bft_cap(b), bft_len(b), bft_data(b));
 }
