@@ -9,8 +9,9 @@ $(shell mkdir -p bin)
 
 lib = bin/buffet
 check = bin/check
+example = bin/example
 
-all: $(lib) $(check)
+all: $(lib) $(check) $(example)
 	
 $(lib): src/buffet.c src/buffet.h
 	@ echo $@
@@ -19,6 +20,10 @@ $(lib): src/buffet.c src/buffet.h
 $(check): src/check.c $(lib)
 	@ echo $@
 	@ $(CP) $< $(lib) -o $@
+
+$(example): src/example.c $(lib)
+	@ echo $@
+	@ $(LINK)
 
 check:
 	@ ./$(check)

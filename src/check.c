@@ -1,12 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdint.h>
 #include <string.h>
 #include <assert.h>
-#include <errno.h>
-#include <stdarg.h>
 
 #include "buffet.h"
+#include "log.h"
 
 #define assert_int(a, b) { if ((int)(a) != (int)(b)) { \
 fprintf(stderr, "%d: %s:%d != %s:%d\n", __LINE__, #a, (int)a, #b, (int)b); \
@@ -16,38 +14,25 @@ exit(EXIT_FAILURE);}}
 fprintf(stderr, "%d: %s:'%s' != %s:'%s'\n", __LINE__, #a, a, #b, b); \
 exit(EXIT_FAILURE);}}
 
-#define assert_strncmp(a, b, n) { if (strncmp(a,b,n)) {\
-fprintf(stderr, "%d: %s:'%s' != %s:'%s'\n", __LINE__, #a, a, #b, b); \
+#define assert_strn(a, b, n) { if (strncmp(a,b,n)) {\
+fprintf(stderr, \
+    "%d: %zu bytes %s:'%s' != %s:'%s'\n", __LINE__, n, #a, a, #b, b); \
 exit(EXIT_FAILURE);}}
 
-#define assert_buf(b, cap, len, str) \
-    assert_int (bft_cap(b), cap);\
-    assert_int (bft_len(b), len);\
-    assert_str (bft_cstr(b), str);
-
-const char* foo = "foo";
-const size_t foolen = 3;
 const char alpha[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const size_t alphalen = strlen(alpha);
-
-static const char* w6  = "aaaaaa";
-static const char* w7  = "aaaaaaa";
-static const char* w8  = "aaaaaaaa";
-static const char* w13 = "aaaaaaaaaaaaa";
-static const char* w14 = "aaaaaaaaaaaaaa";
-static const char* w15 = "aaaaaaaaaaaaaaa";
-static const char* w16 = "aaaaaaaaaaaaaaaa";
-static const char* w17 = "aaaaaaaaaaaaaaaaa";
-static const char* w32 = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
 
 //==============================================================================
 static void u_new (size_t cap) 
 {
     Buffet b; 
-    bft_new (&b, cap);     
+    bft_new (&b, cap); 
+
+    assert (bft_cap(&b) >= cap);    
     assert_int (bft_len(&b), 0);
     assert_str (bft_data(&b), "");
-    assert_str (bft_cstr(&b), "");
+    // assert_str (bft_cstr(&b), "");
+    
     bft_free(&b); 
 }
 
@@ -56,64 +41,82 @@ static void new()
     u_new (0);
     u_new (1);
     u_new (8);
-    u_new (14);
-    u_new (15);
-    u_new (16);
+    u_new (BFT_SSO_CAP-1);
+    u_new (BFT_SSO_CAP);
+    u_new (BFT_SSO_CAP+1);
+    u_new (BFT_SIZE-1);
+    u_new (BFT_SIZE);
+    u_new (BFT_SIZE+1);
     u_new (100);
     u_new (UINT32_MAX);
 }
 
 //==============================================================================
-static void u_copy_str (const char* src, size_t srclen, const char* expstr)
+static void u_strcopy (size_t off, size_t len)
 {
     Buffet b;
-    bft_strcopy (&b, src, srclen);
-    assert_int (bft_len(&b), srclen);
-    assert_str (bft_data(&b), expstr);
-    assert_str (bft_cstr(&b), expstr);
+    bft_strcopy (&b, alpha+off, len);
+
+    assert_int (bft_len(&b), len);
+    assert_strn (bft_data(&b), alpha+off, len);
+    // assert_str (bft_cstr(&b), expstr);
+    
     bft_free(&b);
 }
 
-void copy_str() 
+void strcopy() 
 {
-    u_copy_str ("", 0, ""); 
-    u_copy_str (foo, 0, "");
-    u_copy_str (foo, 1, "f"); 
-    u_copy_str (foo, 2, "fo");
-    u_copy_str (foo, foolen, foo);
-    u_copy_str (w16, 13, w13);
-    u_copy_str (w16, 14, w14);
-    u_copy_str (w16, 15, w15);
-    u_copy_str (w16, 16, w16);
-    u_copy_str (w32, 32, w32);
+    u_strcopy (0, 0); 
+    u_strcopy (0, 1); 
+    u_strcopy (0, 8);
+    u_strcopy (0, BFT_SSO_CAP-1);
+    u_strcopy (0, BFT_SSO_CAP);
+    u_strcopy (0, BFT_SSO_CAP+1);
+    u_strcopy (0, 20);
+    u_strcopy (0, 40);
+
+    u_strcopy (8, 0); 
+    u_strcopy (8, 1); 
+    u_strcopy (8, 8);
+    u_strcopy (8, BFT_SSO_CAP-1);
+    u_strcopy (8, BFT_SSO_CAP);
+    u_strcopy (8, BFT_SSO_CAP+1);
+    u_strcopy (8, 20);
+    u_strcopy (8, 40);
 }
 
 //==============================================================================
-
-static void u_view_str (const char* src, size_t srclen, const char* expstr)
+static void u_strview (size_t off, size_t len)
 {
     Buffet b;
-    bft_strview (&b, src, srclen);
-    assert_int (bft_len(&b), srclen); //bft_dbg(&b);
-    char* out = bft_export(&b);
-    assert_str (out, expstr);
+    bft_strview (&b, alpha+off, len);
+
+    assert_int (bft_len(&b), len);
+    assert_strn (bft_data(&b), alpha+off, len);
     // assert_str (bft_cstr(&b), expstr);
-    free(out);
+    
     bft_free(&b);
 }
 
-void view_str() 
+void strview() 
 {
-    u_view_str ("", 0, ""); 
-    u_view_str (foo, 0, "");
-    u_view_str (foo, 1, "f"); 
-    u_view_str (foo, 2, "fo");
-    u_view_str (foo, foolen, foo);
-    u_view_str (w16, 13, w13);
-    u_view_str (w16, 14, w14);
-    u_view_str (w16, 15, w15);
-    u_view_str (w16, 16, w16);
-    u_view_str (w32, 32, w32);
+    u_strview (0, 0); 
+    u_strview (0, 1); 
+    u_strview (0, 8);
+    u_strview (0, BFT_SSO_CAP-1);
+    u_strview (0, BFT_SSO_CAP);
+    u_strview (0, BFT_SSO_CAP+1);
+    u_strview (0, 20);
+    u_strview (0, 40);
+
+    u_strview (8, 0); 
+    u_strview (8, 1); 
+    u_strview (8, 8);
+    u_strview (8, BFT_SSO_CAP-1);
+    u_strview (8, BFT_SSO_CAP);
+    u_strview (8, BFT_SSO_CAP+1);
+    u_strview (8, 20);
+    u_strview (8, 40);
 }
 
 //==============================================================================
@@ -151,7 +154,7 @@ u_view (size_t srclen, size_t off, size_t len)
     bft_strcopy (&b, alpha, srclen);
     Buffet v = bft_view (&b, off, len);
     assert_int (bft_len(&v), len);
-    assert_strncmp (bft_data(&v), alpha+off, len);
+    assert_strn (bft_data(&v), alpha+off, len);
     bft_free(&v);
     bft_free(&b);
 }
@@ -164,20 +167,20 @@ u_view_ref (size_t off, size_t len)
     Buffet bv = bft_view (&b, 0, alphalen);
     Buffet v = bft_view (&bv, off, len);
     assert_int (bft_len(&v), len);
-    assert_strncmp (bft_data(&v), alpha+off, len);
+    assert_strn (bft_data(&v), alpha+off, len);
     bft_free(&bv);
     bft_free(&v);
     bft_free(&b);
 }
 
 static void 
-u_view_strref (size_t off, size_t len)
+u_strviewref (size_t off, size_t len)
 {
     Buffet b;
     bft_strview (&b, alpha, alphalen);
     Buffet v = bft_view (&b, off, len);
     assert_int (bft_len(&v), len);
-    assert_strncmp (bft_data(&v), alpha+off, len);
+    assert_strn (bft_data(&v), alpha+off, len);
     bft_free(&v);
     bft_free(&b);
 }
@@ -211,8 +214,8 @@ void view()
     u_view_ref (2,8);
     u_view_ref (2,40);
     // on STRVIEW
-    u_view_strref (0, 8);
-    u_view_strref (0, 40);
+    u_strviewref (0, 8);
+    u_strviewref (0, 40);
 }
 
 //==============================================================================
@@ -222,29 +225,32 @@ void u_append_new (size_t cap, size_t len)
     bft_new (&b, cap);
     bft_append (&b, alpha, len);
     assert_int (bft_len(&b), len);
-    assert_strncmp (bft_data(&b), alpha, len);
+    assert_strn (bft_data(&b), alpha, len);
     bft_free(&b);    
 }
 
-void u_append_copystr (size_t initlen, size_t len)
+void u_append_strcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
-    bft_strcopy (&b, alpha, initlen);
-    bft_append (&b, alpha+initlen, len);
+    bft_strcopy (&b, alpha, initlen); 
+    //bft_dbg(&b);
+    bft_append (&b, alpha+initlen, len); 
+    // bft_dbg(&b);
     assert_int (bft_len(&b), totlen);
-    assert_strncmp (bft_data(&b), alpha, totlen);
+    assert_strn (bft_data(&b), alpha, totlen);
     bft_free(&b);    
 }
 
-void u_append_viewstr (size_t initlen, size_t len)
+void u_append_strview (size_t initlen, size_t len)
 {
+    // LOGVI(initlen); LOGVI(len);
     size_t totlen = initlen+len;
     Buffet b;
     bft_strview (&b, alpha, initlen);
     bft_append (&b, alpha+initlen, len);
     assert_int (bft_len(&b), totlen);
-    assert_strncmp (bft_data(&b), alpha, totlen);
+    assert_strn (bft_data(&b), alpha, totlen);
     bft_free(&b);    
 }
 
@@ -256,7 +262,7 @@ void u_append_view (size_t initlen, size_t len)
     Buffet v = bft_view (&b, 0, initlen);
     bft_append (&v, alpha+initlen, len);
     assert_int (bft_len(&v), totlen);
-    assert_strncmp (bft_data(&v), alpha, totlen);
+    assert_strn (bft_data(&v), alpha, totlen);
     bft_free(&v); 
     bft_free(&b);    
 }
@@ -275,21 +281,21 @@ void append()
     u_append_new (40, 8);
     u_append_new (40, 40);
 
-    u_append_copystr (4, 4);
-    u_append_copystr (8, 5);
-    u_append_copystr (8, 6);
-    u_append_copystr (8, 7);
-    u_append_copystr (8, 8);
-    u_append_copystr (8, 20);
-    u_append_copystr (20, 20);
+    u_append_strcopy (4, 4);
+    u_append_strcopy (8, 5);
+    u_append_strcopy (8, 6);
+    u_append_strcopy (8, 7);
+    u_append_strcopy (8, 8);
+    u_append_strcopy (8, 20);
+    u_append_strcopy (20, 20);
 
-    u_append_viewstr (4, 4);
-    u_append_viewstr (8, 5);
-    u_append_viewstr (8, 6);
-    u_append_viewstr (8, 7);
-    u_append_viewstr (8, 8);
-    u_append_viewstr (8, 20);
-    u_append_viewstr (20, 20);
+    u_append_strview (4, 4);
+    u_append_strview (8, 5);
+    u_append_strview (8, 6);
+    u_append_strview (8, 7);
+    u_append_strview (8, 8);
+    u_append_strview (8, 20);
+    u_append_strview (20, 20);
 
     u_append_view (8, 8);
 }
@@ -319,6 +325,7 @@ void export()
     EXP_STRCPY(10);
     EXP_STRCPY(alphalen);
 }
+
 //==============================================================================
 
 #define run(name) { \
@@ -330,22 +337,12 @@ void export()
 int main()
 {
     run (new);
-    run (copy_str);
-    run (view_str);
+    run (strcopy);
+    run (strview);
     run (slice);
     run (view);
     run (append);
     run (export);
-    // run (dup);
-    // run (join);
-    // run (split);
-    // run (append_fmt);
-    // run (resize);
-    // run (reset);
-    // run (adjust);
-    // run (trim);
-    // run (equal);
-    // run (story);
 
     printf ("unit tests OK\n");
     return 0;

@@ -5,7 +5,6 @@
 #define BFT_SSO_CAP (BFT_SIZE-2) // leaving room for NUL & flags
 #define BFT_TYPE_BITS 2
 
-
 typedef union Buffet {
 
 	// init
@@ -39,15 +38,15 @@ void	bft_new (Buffet *dst, size_t cap);
 void 	bft_strcopy (Buffet *dst, const char *src, size_t len);
 void	bft_strview (Buffet *dst, const char *src, size_t len);
 size_t 	bft_append  (Buffet *dst, const char *src, size_t len);
-Buffet 	bft_slice (Buffet *src, size_t off, size_t len);
+Buffet 	bft_slice (const Buffet *src, size_t off, size_t len);
 Buffet	bft_view  (Buffet *src, size_t off, size_t len);
 void	bft_free (Buffet *buf);
 
 size_t	bft_cap (const Buffet* buf);
 size_t	bft_len (const Buffet* buf);
-char*	bft_data (const Buffet* buf);
-const
-char*	bft_cstr (const Buffet* buf);
+const char*	bft_data (const Buffet* buf);
+const char*	bft_cstr (const Buffet* buf);
 char*	bft_export (const Buffet* buf) ;
 
+void	bft_print (const Buffet *buf);
 void 	bft_dbg (Buffet* b);
