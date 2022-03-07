@@ -1,27 +1,30 @@
 #include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
 #include "buffet.h"
-#include "log.h"
 
 int main()
 {
 	char text[] = "The train is fast";
-	Buffet view;
-
-	bft_strview (&view, text+4, 5);
-	bft_print(&view);
+	
+	Buffet vue;
+	bft_strview (&vue, text+4, 5);
+	bft_print(&vue);
 
 	text[4] = 'b';
-	bft_print(&view);
+	bft_print(&vue);
 
-	Buffet view2 = bft_view (&view, 1, 4);
-	bft_print(&view2);
+	Buffet ref = bft_view (&vue, 1, 4);
+	bft_print(&ref);
 
 	char wet[] = " is wet";
-	bft_append (&view2, wet, strlen(wet));
-	bft_print(&view2);
+	bft_append (&ref, wet, sizeof(wet));
+	bft_print(&ref);
 
 	return 0;
 }
+
+/* prints :
+train
+brain
+rain
+rain is wet
+*/

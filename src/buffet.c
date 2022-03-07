@@ -1,10 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
-#include <errno.h>
 #include <assert.h>
-
 #include "buffet.h"
 #include "log.h"
 
@@ -156,6 +153,7 @@ bft_strcopy (Buffet* dst, const char* src, size_t len)
 void
 bft_strview (Buffet* dst, const char* src, size_t len)
 {
+	*dst = ZERO;
 	// save remainder before src address is shifted.
 	dst->off = (intptr_t)src % (1 << BFT_TYPE_BITS);
 	dst->data = ASDATA(src);
@@ -165,11 +163,11 @@ bft_strview (Buffet* dst, const char* src, size_t len)
 
 
 Buffet
-bft_slice (const Buffet *src, size_t off, size_t len)
+bft_copy (const Buffet *src, size_t off, size_t len)
 {
 	Buffet ret;
-	char* data = getdata(src);
-	bft_strcopy (&ret, data+off, len);
+	bft_strcopy (&ret, getdata(src)+off, len);
+
 	return ret;
 }
 
@@ -177,10 +175,9 @@ bft_slice (const Buffet *src, size_t off, size_t len)
 Buffet
 bft_view (Buffet *src, size_t off, size_t len)
 {
-	const Type type = src->type;
 	Buffet ret = ZERO;
 	
-	switch(type) {
+	switch(src->type) {
 		
 		case SSO:
 		case VUE: {
@@ -208,17 +205,17 @@ bft_view (Buffet *src, size_t off, size_t len)
 
 
 void
-bft_free (Buffet* buf)
+bft_free (Buffet *buf)
 {
 	const Type type = buf->type;
 
 	if (type == OWN && !buf->refcnt) {
 
-		free((char*)DATA(buf));
+		free(DATA(buf));
 	
 	} else if (type == REF) {
 	
-		Buffet* ref = SRC(buf);
+		Buffet *ref = SRC(buf);
 		--ref->refcnt;
 	}
 
@@ -241,6 +238,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 			buf->ssolen = newlen;
 		} else {
 			char *data = grow_sso (buf, newlen);
+			if (!data) {ERR("grow fail"); return 0;}
 			memcpy (data+curlen, src, srclen);
 			data[newlen] = 0;
 			buf->len = newlen;
@@ -255,7 +253,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 			memcpy (data+curlen, src, srclen);
 		} else {
 			data = grow_own (buf, newlen);
-			// if (!data) {ERR("grow fail"); return 0;}
+			if (!data) {ERR("grow fail"); return 0;}
 			memcpy (data+curlen, src, srclen);
 		}
 
@@ -276,29 +274,28 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 }
 
 
+// todo no alloc if ref/vue whole len or stops at end
 const char*
-bft_cstr (const Buffet* buf) 
+bft_cstr (const Buffet* buf, bool *mustfree) 
 {
-	const Type type = buf->type;
+	const char *data = getdata(buf);
+	*mustfree = false;
 
-	switch(type) {
+	switch(buf->type) {
 		
 		case SSO:
-			return (const char*)buf->sso;
-		
 		case OWN:
-			return (const char*)DATA(buf);
-		
-		case REF: {
-			const size_t len = buf->len;
-			Buffet *ref = SRC(buf);
-			char* cpy = malloc(len+1);
-			memcpy(cpy, (char*)DATA(ref)+buf->off, len);
-			cpy[len] = 0;
-			return (const char*)cpy; }
+			return data;
 		
 		case VUE:
-			return NULL;
+		case REF: {
+			const size_t len = buf->len;
+			char* ret = malloc(len+1);
+			memcpy (ret, data, len);
+			ret[len] = 0;
+			*mustfree = true;
+			return ret;
+		}
 	}
 
 	return NULL;
@@ -308,9 +305,8 @@ bft_cstr (const Buffet* buf)
 char*
 bft_export (const Buffet* buf) 
 {
-	// const Type type = buf->type;
-	char* data = getdata(buf);
 	const size_t len = getlen(buf);
+	const char* data = getdata(buf);
 	char* ret = malloc(len+1);
 	
 	memcpy (ret, data, len);
@@ -334,15 +330,26 @@ bft_len (const Buffet* buf) {
 	return getlen(buf);
 }
 
+static void
+print_type (Buffet *buf, char *out) {
+	switch(buf->type) {
+		case SSO: sprintf(out,"SSO"); break;
+		case OWN: sprintf(out,"OWN"); break;
+		case REF: sprintf(out,"REF"); break;
+		case VUE: sprintf(out,"VUE"); break;
+	}
+}
+
 void 
-bft_dbg (Buffet* buf) {
-	printf ("type %d cap %zu len %zu data '%s'\n", 
-		buf->type, bft_cap(buf), bft_len(buf), bft_data(buf));
+bft_dbg (Buffet* buf) 
+{
+	char type[5];
+	print_type(buf, type);
+	printf ("type:%s cap:%zu len:%zu data:'%s'\n", 
+		type, bft_cap(buf), bft_len(buf), bft_data(buf));
 }
 
 void
 bft_print (const Buffet *buf) {
-	const char *data = getdata(buf);
-	int len = getlen(buf);
-	printf("%.*s\n", len, data);
+	printf("%.*s\n", (int)getlen(buf), getdata(buf));
 }

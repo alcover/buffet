@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include "buffet.h"
 #include "log.h"
 
@@ -19,8 +18,39 @@ fprintf(stderr, \
     "%d: %zu bytes %s:'%s' != %s:'%s'\n", __LINE__, n, #a, a, #b, b); \
 exit(EXIT_FAILURE);}}
 
-const char alpha[] = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const char alpha[] = 
+"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+=";
 const size_t alphalen = strlen(alpha);
+
+char tmp[100];
+
+static char* 
+take(size_t off, size_t len) {
+    memcpy(tmp, alpha+off, len);
+    tmp[len] = 0;
+    return tmp;
+}
+
+static void 
+check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
+{
+    bool mustfree;
+    const char *cstr = bft_cstr(b, &mustfree);
+    const char *expstr = take(off,len);
+
+    assert_str (cstr, expstr);
+    assert (mustfree == expfree);
+
+    if (expfree) free((char*)cstr);
+}
+
+void check_export (Buffet *b, size_t off, size_t len)
+{
+    char *export = bft_export(b);
+    const char *expstr = take(off,len);
+    assert_str (export, expstr);
+    free(export);
+}
 
 //==============================================================================
 static void u_new (size_t cap) 
@@ -31,7 +61,8 @@ static void u_new (size_t cap)
     assert (bft_cap(&b) >= cap);    
     assert_int (bft_len(&b), 0);
     assert_str (bft_data(&b), "");
-    // assert_str (bft_cstr(&b), "");
+    check_cstr (&b, 0, 0, false);
+    check_export (&b, 0, 0);
     
     bft_free(&b); 
 }
@@ -59,7 +90,8 @@ static void u_strcopy (size_t off, size_t len)
 
     assert_int (bft_len(&b), len);
     assert_strn (bft_data(&b), alpha+off, len);
-    // assert_str (bft_cstr(&b), expstr);
+    check_cstr (&b, off, len, false);
+    check_export (&b, off, len);
     
     bft_free(&b);
 }
@@ -93,7 +125,8 @@ static void u_strview (size_t off, size_t len)
 
     assert_int (bft_len(&b), len);
     assert_strn (bft_data(&b), alpha+off, len);
-    // assert_str (bft_cstr(&b), expstr);
+    check_cstr (&b, off, len, true);
+    check_export (&b, off, len);
     
     bft_free(&b);
 }
@@ -121,28 +154,41 @@ void strview()
 
 //==============================================================================
 static void 
-u_slice (const char* src, size_t off, size_t len, const char* expstr)
+u_copy (size_t off, size_t len)
 {
-    Buffet b;
-    bft_strcopy (&b, src, strlen(src));
-    Buffet v = bft_slice(&b, off, len);
-    assert_int (bft_len(&v), len);
-    assert_str (bft_cstr(&v), expstr);
-    bft_free(&v);
+    Buffet src;
+    bft_strcopy (&src, alpha, alphalen);
+    Buffet b = bft_copy(&src, off, len);
+
+    assert_int (bft_len(&b), len);
+    assert_strn (bft_data(&b), alpha+off, len);
+    check_cstr (&b, off, len, false);
+    check_export (&b, off, len);
+    
     bft_free(&b);
+    bft_free(&src);
 }
 
-void slice()
+void copy()
 {
-    u_slice ("abcd", 0, 0, "");
-    u_slice ("abcd", 0, 2, "ab");
-    u_slice ("abcd", 2, 2, "cd");
-    u_slice ("abcd", 0, 4, "abcd");
+    u_copy (0, 0); 
+    u_copy (0, 1); 
+    u_copy (0, 8);
+    u_copy (0, BFT_SSO_CAP-1);
+    u_copy (0, BFT_SSO_CAP);
+    u_copy (0, BFT_SSO_CAP+1);
+    u_copy (0, 20);
+    u_copy (0, 40);
 
-    u_slice (alpha, 0, 0, "");
-    u_slice (alpha, 0, 2, "ab");
-    u_slice (alpha, 2, 2, "cd");
-    u_slice (alpha, 0, alphalen, alpha);
+    u_copy (8, 0); 
+    u_copy (8, 1); 
+    u_copy (8, 8);
+    u_copy (8, BFT_SSO_CAP-1);
+    u_copy (8, BFT_SSO_CAP);
+    u_copy (8, BFT_SSO_CAP+1);
+    u_copy (8, 20);
+    u_copy (8, 40);
+    u_copy (0, alphalen);
 }
 
 //==============================================================================
@@ -150,13 +196,17 @@ void slice()
 static void 
 u_view (size_t srclen, size_t off, size_t len)
 {
-    Buffet b;
-    bft_strcopy (&b, alpha, srclen);
-    Buffet v = bft_view (&b, off, len);
-    assert_int (bft_len(&v), len);
-    assert_strn (bft_data(&v), alpha+off, len);
-    bft_free(&v);
-    bft_free(&b);
+    Buffet src;
+    bft_strcopy (&src, alpha, srclen);
+    Buffet view = bft_view (&src, off, len);
+
+    assert_int (bft_len(&view), len);
+    assert_strn (bft_data(&view), alpha+off, len);
+    check_cstr (&view, off, len, true);
+    check_export (&view, off, len);
+    
+    bft_free(&view);
+    bft_free(&src);
 }
 
 static void 
@@ -164,45 +214,44 @@ u_view_ref (size_t off, size_t len)
 {
     Buffet b;
     bft_strcopy (&b, alpha, alphalen);
-    Buffet bv = bft_view (&b, 0, alphalen);
-    Buffet v = bft_view (&bv, off, len);
-    assert_int (bft_len(&v), len);
-    assert_strn (bft_data(&v), alpha+off, len);
-    bft_free(&bv);
-    bft_free(&v);
+    Buffet src = bft_view (&b, 0, alphalen);
+    Buffet view = bft_view (&src, off, len);
+
+    assert_int (bft_len(&view), len);
+    assert_strn (bft_data(&view), alpha+off, len);
+    check_cstr (&view, off, len, true);
+    check_export (&view, off, len); 
+    
+    bft_free(&view);
+    bft_free(&src);
     bft_free(&b);
 }
 
 static void 
-u_strviewref (size_t off, size_t len)
+u_view_vue (size_t off, size_t len)
 {
-    Buffet b;
-    bft_strview (&b, alpha, alphalen);
-    Buffet v = bft_view (&b, off, len);
-    assert_int (bft_len(&v), len);
-    assert_strn (bft_data(&v), alpha+off, len);
-    bft_free(&v);
-    bft_free(&b);
-}
+    Buffet src;
+    bft_strview (&src, alpha, alphalen);
+    Buffet view = bft_view (&src, off, len);
 
-Buffet create(size_t len){
-    Buffet a;
-    bft_strcopy(&a, alpha, len);
-    Buffet b = bft_view(&a, 4, 4);
-    return b;
+    assert_int (bft_len(&view), len);
+    assert_strn (bft_data(&view), alpha+off, len);
+    check_cstr (&view, off, len, true);
+    check_export (&view, off, len);
+
+    bft_free(&view);
+    bft_free(&src);
 }
 
 void view()
 {
-    // Buffet b = create(8);
-    // bft_dbg(&b);
     // on SSO
     u_view (8, 0, 0);
     u_view (8, 0, 4);
     u_view (8, 0, 8);
     u_view (8, 2, 6);
     u_view (8, 4, 4);
-    // on PTR
+    // on OWN
     u_view (40, 0, 0);
     u_view (40, 0, 8);
     u_view (40, 0, 38);
@@ -213,9 +262,9 @@ void view()
     u_view_ref (0,40);
     u_view_ref (2,8);
     u_view_ref (2,40);
-    // on STRVIEW
-    u_strviewref (0, 8);
-    u_strviewref (0, 40);
+    // on VUE
+    u_view_vue (0, 8);
+    u_view_vue (0, 40);
 }
 
 //==============================================================================
@@ -224,8 +273,12 @@ void u_append_new (size_t cap, size_t len)
     Buffet b;
     bft_new (&b, cap);
     bft_append (&b, alpha, len);
+
     assert_int (bft_len(&b), len);
     assert_strn (bft_data(&b), alpha, len);
+    check_cstr (&b, 0, len, false);
+    check_export (&b, 0, len);
+
     bft_free(&b);    
 }
 
@@ -234,36 +287,45 @@ void u_append_strcopy (size_t initlen, size_t len)
     size_t totlen = initlen+len;
     Buffet b;
     bft_strcopy (&b, alpha, initlen); 
-    //bft_dbg(&b);
     bft_append (&b, alpha+initlen, len); 
-    // bft_dbg(&b);
+
     assert_int (bft_len(&b), totlen);
     assert_strn (bft_data(&b), alpha, totlen);
+    check_cstr (&b, 0, totlen, false);
+    check_export (&b, 0, totlen);
+
     bft_free(&b);    
 }
 
 void u_append_strview (size_t initlen, size_t len)
 {
-    // LOGVI(initlen); LOGVI(len);
     size_t totlen = initlen+len;
     Buffet b;
     bft_strview (&b, alpha, initlen);
     bft_append (&b, alpha+initlen, len);
+
     assert_int (bft_len(&b), totlen);
     assert_strn (bft_data(&b), alpha, totlen);
+    check_cstr (&b, 0, totlen, false);
+    check_export (&b, 0, totlen);
+    
     bft_free(&b);    
 }
 
 void u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buffet b;
-    bft_strcopy (&b, alpha, initlen);
-    Buffet v = bft_view (&b, 0, initlen);
-    bft_append (&v, alpha+initlen, len);
-    assert_int (bft_len(&v), totlen);
-    assert_strn (bft_data(&v), alpha, totlen);
-    bft_free(&v); 
+    Buffet src;
+    bft_strcopy (&src, alpha, initlen);
+    Buffet b = bft_view (&src, 0, initlen);
+    bft_append (&b, alpha+initlen, len);
+
+    assert_int (bft_len(&b), totlen);
+    assert_strn (bft_data(&b), alpha, totlen);
+    check_cstr (&b, 0, totlen, false);
+    check_export (&b, 0, totlen);
+    
+    bft_free(&b); 
     bft_free(&b);    
 }
 
@@ -301,48 +363,24 @@ void append()
 }
 
 //==============================================================================
-void export()
+void free_()
 {
-    #define EXP_NEW(cap) {\
-        Buffet b;\
-        bft_new(&b, cap);\
-        char* out = bft_export(&b);\
-        assert_str(out, "");\
-        free(out);\
-        bft_free(&b);\
-    }
-    EXP_NEW(10);
-    EXP_NEW(100);
 
-   #define EXP_STRCPY(len) {\
-        Buffet b;\
-        bft_strcopy(&b, alpha, len);\
-        char* out = bft_export(&b);\
-        assert (!strncmp(out, alpha, len));\
-        free(out);\
-        bft_free(&b);\
-    }
-    EXP_STRCPY(10);
-    EXP_STRCPY(alphalen);
 }
-
 //==============================================================================
 
-#define run(name) { \
-    printf("%s ", #name); fflush(stdout); \
-    name(); \
-    puts("OK"); \
-}
+// #define run(fun) printf("%s ",#fun); fflush(stdout); fun(); puts("OK");
+#define run(fun) fun();
 
 int main()
 {
-    run (new);
-    run (strcopy);
-    run (strview);
-    run (slice);
-    run (view);
-    run (append);
-    run (export);
+    run(new)
+    run(strcopy)
+    run(strview)
+    run(copy)
+    run(view)
+    run(append)
+    run(free_)
 
     printf ("unit tests OK\n");
     return 0;
