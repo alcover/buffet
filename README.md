@@ -22,25 +22,25 @@ Through a tagged union:
 ```C
 typedef union Buffet {
       
-      // SSO
-      struct {
-            char        sso[15]  // in-situ data
-            uint8_t     ssolen:4 // in-situ length
-      }
-      
-      // OWN | REF | VUE
-      struct { 
-            uint32_t len // data length
-            union {
-                  uint32_t off // REF: data offset; VUE: address remainder
-                  struct {
-                        uint16_t refcnt // OWN: number of references
-                        uint8_t  cap    // OWN: capacity as log2(allocated mem)
-                  }
-            }
-            intptr_t data : 62 // OWN|VUE: data pointer; REF: pointer to owner
-            uint8_t  type : 2  // tag = {SSO|OWN|REF|VUE}
-      }
+    // SSO
+    struct {
+        char        sso[15]  // in-situ data
+        uint8_t     ssolen:4 // in-situ length
+    }
+
+    // OWN | REF | VUE
+    struct { 
+        uint32_t len // data length
+        union {
+              uint32_t off // REF: data offset; VUE: address remainder
+              struct {
+                    uint16_t refcnt // OWN: number of references
+                    uint8_t  cap    // OWN: log2(allocated mem)
+              }
+        }
+        intptr_t data : 62 // OWN|VUE: data ptr; REF: ptr to owner
+        uint8_t  type : 2  // tag = {SSO|OWN|REF|VUE}
+    }
 }
 ```  
 Depending on its tag, a *Buffet* is interpreted as either
@@ -69,23 +69,23 @@ Any *owned* data (SSO/OWN) is NUL-terminated.
 
 int main()
 {
-      char text[] = "The train is fast";
-      
-      Buffet vue;
-      bft_strview (&vue, text+4, 5);
-      bft_print(&vue);
+    char text[] = "The train is fast";
 
-      text[4] = 'b';
-      bft_print(&vue);
+    Buffet vue;
+    bft_strview (&vue, text+4, 5);
+    bft_print(&vue);
 
-      Buffet ref = bft_view (&vue, 1, 4);
-      bft_print(&ref);
+    text[4] = 'b';
+    bft_print(&vue);
 
-      char wet[] = " is wet";
-      bft_append (&ref, wet, sizeof(wet));
-      bft_print(&ref);
+    Buffet ref = bft_view (&vue, 1, 4);
+    bft_print(&ref);
 
-      return 0;
+    char wet[] = " is wet";
+    bft_append (&ref, wet, sizeof(wet));
+    bft_print(&ref);
+
+    return 0;
 }
 ```
 
@@ -190,26 +190,36 @@ bft_dbg(&buf);
 ## Accessors / export
 
 ### bft_cap  
-`size_t bft_cap (Buffet *buf)`  
 Get current capacity.  
+```C
+size_t bft_cap (Buffet *buf)
+```
 
 ### bft_len  
-`size_t bft_len (Buffet *buf)`  
 Get current length.  
+```C
+size_t bft_len (Buffet *buf)`
+```
 
 ### bft_data
-`const char* bft_data (const Buffet *buf)`  
 Get current data pointer.  
+```C
+const char* bft_data (const Buffet *buf)`
+```
 If *buf* is a ref/view, `strlen(bft_data)` may be longer than `buf.len`. 
 
 ### bft_cstr
-`const char* bft_cstr (const Buffet *buf, bool *mustfree)`  
 Get current data as a NUL-terminated **C string**.  
+```C
+const char* bft_cstr (const Buffet *buf, bool *mustfree)
+```
 If REF/VUE, the slice is copied into a fresh C string that must be freed.
 
 ### bft_export
-`char* bft_export (const Buffet *buf)`  
  Copies data up to `buf.len` into a fresh C string that must be freed.
+```C
+char* bft_export (const Buffet *buf)
+```
 
 
 ## Utilities
