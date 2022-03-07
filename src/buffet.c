@@ -20,6 +20,10 @@ typedef enum {
 #define DATA(buf) ((char*)((intptr_t)((buf)->data) << BFT_TYPE_BITS))
 #define SRC(view) ((Buffet*)(DATA(view)))
 #define ZERO ((Buffet){.fill={0}})
+
+// check if pointer is safely aligned to be shifted for 62 bits
+#define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<BFT_TYPE_BITS));
+
 //==============================================================================
 
 static unsigned int 
@@ -106,6 +110,10 @@ grow_own (Buffet *buf, size_t cap)
 
     if (!data) return NULL;
 
+    // since there is no aligned_realloc()...
+    assert_aligned(data);
+
+
     buf->data = ASDATA(data);
     buf->cap = caplog;
 
@@ -115,7 +123,7 @@ grow_own (Buffet *buf, size_t cap)
 //==============================================================================
 
 void
-bft_new (Buffet* dst, size_t cap)
+bft_new (Buffet *dst, size_t cap)
 {
     *dst = ZERO; //sure init?
 
@@ -127,14 +135,14 @@ bft_new (Buffet* dst, size_t cap)
 
 
 void
-bft_strcopy (Buffet* dst, const char* src, size_t len)
+bft_strcopy (Buffet *dst, const char* src, size_t len)
 {
     *dst = ZERO;
     
     if (len <= BFT_SSO_CAP) {
 
         memcpy(dst->sso, src, len);
-        dst->sso[len] = 0; //?
+        dst->sso[len] = 0; // redundant if zero-init
         dst->ssolen = len;
     
     } else {
@@ -148,7 +156,7 @@ bft_strcopy (Buffet* dst, const char* src, size_t len)
 
 
 void
-bft_strview (Buffet* dst, const char* src, size_t len)
+bft_strview (Buffet *dst, const char* src, size_t len)
 {
     *dst = ZERO;
     // save remainder before src address is shifted.
@@ -182,7 +190,6 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
             break;
         
         case OWN:
-            // assert_aligned(src);
             ret.data = ASDATA(src);
             ret.off = off;
             ret.len = len;
