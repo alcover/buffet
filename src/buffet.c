@@ -19,9 +19,7 @@ typedef enum {
 #define ASDATA(ptr) ((intptr_t)(ptr) >> BFT_TYPE_BITS)
 #define DATA(buf) ((char*)((intptr_t)((buf)->data) << BFT_TYPE_BITS))
 #define SRC(view) ((Buffet*)(DATA(view)))
-#define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<BFT_TYPE_BITS));
 #define ZERO ((Buffet){.fill={0}})
-
 //==============================================================================
 
 static unsigned int 
@@ -67,9 +65,8 @@ static char*
 alloc (Buffet *dst, size_t cap)
 {
     const uint8_t caplog = nextlog2(cap+1);
-    char *data = malloc(EXP(caplog)); 
-    
-    assert_aligned(data);
+    size_t mem = EXP(caplog);
+    char *data = aligned_alloc(BFT_SIZE, mem);
     
     *dst = ZERO;
     *dst = (Buffet){
@@ -163,7 +160,7 @@ bft_strview (Buffet* dst, const char* src, size_t len)
 
 
 Buffet
-bft_copy (const Buffet *src, size_t off, size_t len)
+bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
 {
     Buffet ret;
     bft_strcopy (&ret, getdata(src)+off, len);
@@ -172,7 +169,7 @@ bft_copy (const Buffet *src, size_t off, size_t len)
 
 
 Buffet
-bft_view (Buffet *src, size_t off, size_t len)
+bft_view (Buffet *src, ptrdiff_t off, size_t len)
 {
     Buffet ret = ZERO;
     
@@ -185,7 +182,7 @@ bft_view (Buffet *src, size_t off, size_t len)
             break;
         
         case OWN:
-            assert_aligned(src);
+            // assert_aligned(src);
             ret.data = ASDATA(src);
             ret.off = off;
             ret.len = len;

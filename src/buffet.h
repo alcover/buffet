@@ -39,8 +39,8 @@ void    bft_new (Buffet *dst, size_t cap);
 void    bft_strcopy (Buffet *dst, const char *src, size_t len);
 void    bft_strview (Buffet *dst, const char *src, size_t len);
 size_t  bft_append  (Buffet *dst, const char *src, size_t len);
-Buffet  bft_copy (const Buffet *src, size_t off, size_t len);
-Buffet  bft_view (Buffet *src, size_t off, size_t len);
+Buffet  bft_copy (const Buffet *src, ptrdiff_t off, size_t len);
+Buffet  bft_view (Buffet *src, ptrdiff_t off, size_t len);
 void    bft_free (Buffet *buf);
 
 size_t  bft_cap (const Buffet *buf);
