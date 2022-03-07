@@ -102,7 +102,25 @@ rain is wet
 
 # API
 
-## Create / release
+[bft_new](#bft_new)  
+[bft_strcopy](#bft_strcopy)  
+[bft_strview](#bft_strview)  
+[bft_copy](#bft_copy)  
+[bft_view](#bft_view)  
+[bft_free](#bft_free)  
+
+[bft_append](#bft_append)  
+
+[bft_cap](#bft_cap)  
+[bft_len](#bft_len)  
+[bft_data](#bft_data)  
+
+[bft_cstr](#bft_cstr)  
+[bft_export](#bft_export)  
+
+[bft_print](#bft_print)  
+[bft_dbg](#bft_dbg)  
+
 
 ### bft_new
 ```C
@@ -121,7 +139,7 @@ bft_dbg(&buf);
 ```C
 void bft_strcopy (Buffet *dst, const char *src, size_t len)
 ```
-Copy `len` bytes from `src`.  
+Copy `len` bytes from `src` into new `dst`.  
 
 ```C
 Buffet copy;
@@ -135,7 +153,7 @@ bft_dbg(&copy);
 ```C
 void bft_strview (Buffet *dst, const char *src, size_t len)
 ```
-View `len` bytes from `src`.  
+View `len` bytes from `src` into new `dst`.  
 You get a window into `src`. No copy or allocation is done.
 
 ```C
@@ -146,6 +164,36 @@ bft_dbg(&view);
 // type:VUE cap:0 len:6 data:'Buffet!'
 bft_print(&view);
 // Buf
+```
+
+### bft_copy
+```C
+Buffet bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
+```
+Create new *Buffet* by copying `len` bytes from [`src` + `off`].  
+The return is an independant owning Buffet.
+
+
+### bft_view
+```C
+Buffet bft_view (Buffet *src, ptrdiff_t off, size_t len)
+```
+Create new *Buffet* by viewing `len` bytes from [`src` + `off`].  
+The return is internally either 
+- a reference to `src` if `src` is owning
+- a reference to `src`'s origin if `src` is itself a REF
+- a view on `src` data if `src` is SSO or VUE
+
+`src` now cannot be released before either  
+- the return is released
+- the return is detached as owner (e.g. when you `append()` to it).
+
+```C
+Buffet src;
+bft_strcopy(&src, "Bonjour", 7);
+Buffet ref = bft_view(&src, 0, 3);
+bft_dbg(&ref);   // type:VUE cap:0 len:6 data:'Buffet!'
+bft_print(&ref); // Bon
 ```
 
 
@@ -167,7 +215,7 @@ bft_dbg(&buf);
 // type:SSO cap:14 len:0 data:''
 ```
 
-## Modify
+
 
 ### bft_append
 ```C
@@ -187,7 +235,7 @@ bft_dbg(&buf);
 ```
 
 
-## Accessors / export
+
 
 ### bft_cap  
 Get current capacity.  
@@ -222,15 +270,19 @@ char* bft_export (const Buffet *buf)
 ```
 
 
-## Utilities
 
 ### bft_print
-`void bft_print (const Buffet *buf)`  
 Prints data up to `buf.len`.
+```C
+void bft_print (const Buffet *buf)`
+```
 
 ### bft_dbg  
-`void bft_dbg (Buffet *buf)`  
-Prints the state of a *Buffet*.  
+Prints *buf* state.  
+```C
+void bft_dbg (Buffet *buf)
+```
+
 ```C
 Buffet buf;
 bft_strcopy(&buf, "foo", 3);
