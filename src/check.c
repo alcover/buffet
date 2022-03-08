@@ -20,7 +20,7 @@ exit(EXIT_FAILURE);}}
 
 const char alpha[] = 
 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+=";
-const size_t alphalen = strlen(alpha);
+const size_t alphalen = 64;
 
 char tmp[100];
 
