@@ -1,3 +1,8 @@
+/*
+Buffet - All-inclusive Buffer for C
+Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
+*/
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
