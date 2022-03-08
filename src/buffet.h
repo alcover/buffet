@@ -1,3 +1,6 @@
+#ifndef BUFFET_H
+#define BUFFET_H
+
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -51,3 +54,5 @@ char*   bft_export (const Buffet *buf);
 
 void    bft_print (const Buffet *buf);
 void    bft_dbg (Buffet *buf);
+
+#endif
