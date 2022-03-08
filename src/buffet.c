@@ -207,23 +207,34 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
-// needs further hardening
+// needs hardening ?
 void
 bft_free (Buffet *buf)
 {
-    const Type type = buf->type;
+    switch(buf->type) {
+        
+        case OWN:
+            // if nobody's looking, we are go
+            if (!buf->refcnt) {
+                free(DATA(buf));
+                *buf = ZERO;
+            }
+            break;
 
-    if (type == OWN) { 
-        if (!buf->refcnt) {
-            free(DATA(buf));
+        case REF: {
+            // tell owner it has one less viewer
+            Buffet *ref = SRC(buf);
+            --ref->refcnt;
             *buf = ZERO;
-        }
-    } else if (type == REF) {
-        Buffet *ref = SRC(buf);
-        --ref->refcnt;
-        *buf = ZERO;
-    } else {
-        *buf = ZERO;
+        }   break;
+
+        case SSO:
+            // If user had a view on this SSO, 
+            // it was her duty to keep it intact and in scope.
+        case VUE:
+            // Idem.
+            *buf = ZERO;
+            break;
     }
 }
 
