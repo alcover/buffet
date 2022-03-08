@@ -207,19 +207,24 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
+// needs further hardening
 void
 bft_free (Buffet *buf)
 {
     const Type type = buf->type;
 
-    if (type == OWN && !buf->refcnt) {
-        free(DATA(buf));
+    if (type == OWN) { 
+        if (!buf->refcnt) {
+            free(DATA(buf));
+            *buf = ZERO;
+        }
     } else if (type == REF) {
         Buffet *ref = SRC(buf);
         --ref->refcnt;
+        *buf = ZERO;
+    } else {
+        *buf = ZERO;
     }
-
-    *buf = ZERO;
 }
 
 
