@@ -170,7 +170,7 @@ bft_print(&view);
 ```C
 Buffet bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new *Buffet* by copying `len` bytes from [`src` + `off`].  
+Create new *Buffet* by copying `len` bytes from [data(`src`) + `off`].  
 The return is an independant owning Buffet.
 
 
@@ -178,7 +178,7 @@ The return is an independant owning Buffet.
 ```C
 Buffet bft_view (Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new *Buffet* by viewing `len` bytes from [`src` + `off`].  
+Create new *Buffet* by viewing `len` bytes from [data(`src`) + `off`].  
 The return is internally either 
 - a reference to `src` if `src` is owning
 - a reference to `src`'s origin if `src` is itself a REF
