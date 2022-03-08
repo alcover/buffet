@@ -1,0 +1,10 @@
+{
+  "name": "buffet",
+  "version": "0.1.0",
+  "repo": "alcover/buffet",
+  "src": [
+    "src/buffet.c",
+    "src/buffet.h",
+    "src/log.h"
+  ]
+}
