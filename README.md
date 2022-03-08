@@ -2,7 +2,9 @@
 
 # Buffet
 All-inclusive Buffer for C  
-(Unit-tested but not yet stable, optimized or feature-complete)
+(Unit-tested but not yet stable, optimized or feature-complete)  
+
+![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
 
 :orange_book: [API](#API)
 
