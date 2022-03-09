@@ -76,6 +76,8 @@ alloc (Buffet *dst, size_t cap)
     const uint8_t caplog = nextlog2(cap+1);
     size_t mem = EXP(caplog);
     char *data = aligned_alloc(BFT_SIZE, mem);
+
+    if (!data) {ERR("failed alloc"); return NULL;}
     
     *dst = ZERO;
     *dst = (Buffet){
@@ -107,6 +109,7 @@ grow_sso (Buffet *buf, size_t cap)
     return data;
 }
 
+
 static char*
 grow_own (Buffet *buf, size_t cap)
 {
@@ -114,10 +117,8 @@ grow_own (Buffet *buf, size_t cap)
     char *data = realloc(DATA(buf), EXP(caplog));
 
     if (!data) return NULL;
-
     // since there is no aligned_realloc()...
     assert_aligned(data);
-
 
     buf->data = ASDATA(data);
     buf->cap = caplog;
@@ -134,6 +135,7 @@ bft_new (Buffet *dst, size_t cap)
 
     if (cap > BFT_SSO_CAP) {
         char* data = alloc(dst, cap);
+        if (!data) return;
         data[0] = 0;
     }
 }
@@ -156,6 +158,7 @@ bft_strcopy (Buffet *dst, const char* src, size_t len)
     } else {
     
         char* data = alloc(dst, len);
+        if (!data) return;
         memcpy(data, src, len);
         data[len] = 0;
         dst->len = len;
@@ -308,7 +311,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 
 // todo no alloc if ref/vue whole len or stops at end
 const char*
-bft_cstr (const Buffet* buf, bool *mustfree) 
+bft_cstr (const Buffet *buf, bool *mustfree) 
 {
     const char *data = getdata(buf);
     *mustfree = false;
@@ -323,6 +326,13 @@ bft_cstr (const Buffet* buf, bool *mustfree)
         case REF: {
             const size_t len = buf->len;
             char* ret = malloc(len+1);
+
+            if (!ret) {
+                ERR("failed alloc"); 
+                *mustfree = true;
+                return calloc(1,1);
+            }
+            
             memcpy (ret, data, len);
             ret[len] = 0;
             *mustfree = true;
@@ -340,6 +350,11 @@ bft_export (const Buffet* buf)
     const size_t len = getlen(buf);
     const char* data = getdata(buf);
     char* ret = malloc(len+1);
+
+    if (!ret) {
+        ERR("failed alloc"); 
+        return calloc(1,1);
+    }
     
     memcpy (ret, data, len);
     ret[len] = 0;
