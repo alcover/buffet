@@ -130,7 +130,7 @@ grow_own (Buffet *buf, size_t cap)
 void
 bft_new (Buffet *dst, size_t cap)
 {
-    *dst = ZERO; //sure init?
+    *dst = ZERO; //sure init? see below
 
     if (cap > BFT_SSO_CAP) {
         char* data = alloc(dst, cap);
@@ -142,6 +142,9 @@ bft_new (Buffet *dst, size_t cap)
 void
 bft_strcopy (Buffet *dst, const char* src, size_t len)
 {
+    // TODO check ! 
+    // - warrant real zeroes
+    // - C spec read union field w/o setting it explicitly 
     *dst = ZERO;
     
     if (len <= BFT_SSO_CAP) {
@@ -212,25 +215,33 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
-// needs hardening ?
 void
 bft_free (Buffet *buf)
 {
     switch(buf->type) {
         
         case OWN:
-            // if nobody's looking, we are go
+            // nobody looking, we are go
             if (!buf->refcnt) {
                 free(DATA(buf));
                 *buf = ZERO;
+            } else {
+            // else wait for last ref to go
+                buf->wantfree = 1;
             }
             break;
 
         case REF: {
-            // tell owner it has one less viewer
-            Buffet *ref = SRC(buf);
-            --ref->refcnt;
+            Buffet *owner = SRC(buf);
             *buf = ZERO;
+            // tell owner it has one less ref
+            --owner->refcnt;
+            // if it was the last ref on a free-waiting owner,
+            // free the owner
+            if (owner->wantfree && !owner->refcnt ) {
+                free(DATA(owner));
+                *owner = ZERO;
+            }
         }   break;
 
         case SSO:
@@ -361,16 +372,18 @@ print_type (Buffet *buf, char *out) {
     }
 }
 
+void
+bft_print (const Buffet *buf) {
+    printf("%.*s\n", (int)getlen(buf), getdata(buf));
+}
+
 void 
 bft_dbg (Buffet* buf) 
 {
     char type[5];
     print_type(buf, type);
-    printf ("type:%s cap:%zu len:%zu data:'%s'\n", 
+    printf ("type:%s cap:%zu len:%zu data:'%s' ", 
         type, bft_cap(buf), bft_len(buf), bft_data(buf));
-}
-
-void
-bft_print (const Buffet *buf) {
-    printf("%.*s\n", (int)getlen(buf), getdata(buf));
+    printf ("viewing:");
+    bft_print(buf);
 }

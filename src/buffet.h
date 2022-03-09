@@ -46,14 +46,14 @@ typedef union Buffet {
             struct {
                 uint16_t refcnt;
                 uint8_t  cap;
-                uint8_t  :8;
+                uint8_t  wantfree:1;
             };
         };
         intptr_t data : 8*sizeof(intptr_t)-BFT_TYPE_BITS;
         uint8_t  type : BFT_TYPE_BITS;
     };
 
-} __attribute__((aligned(BFT_SIZE))) Buffet;
+} Buffet;
 
 
 void    bft_new (Buffet *dst, size_t cap);
