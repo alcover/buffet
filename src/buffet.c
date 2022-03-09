@@ -203,7 +203,7 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
             ret.off = off;
             ret.len = len;
             ret.type = REF;     
-            src->refcnt += 1;
+            ++ src->refcnt;
             break;
         
         case REF: {
@@ -222,8 +222,8 @@ bft_free (Buffet *buf)
     switch(buf->type) {
         
         case OWN:
-            // if no ref left and owner is marked for freeing, we are go
-            // else mark owner for freeing
+            // if no ref left and owner is marked for release, we are go.
+            // else mark owner for release
             if (!(buf->refcnt-1)) {
                 free(DATA(buf));
                 *buf = ZERO;
@@ -235,10 +235,9 @@ bft_free (Buffet *buf)
         case REF: {
             Buffet *owner = SRC(buf);
             *buf = ZERO;
-            // tell owner it has one less ref
+            // tell owner it has one less ref..
             -- owner->refcnt;
-            // if it was the last ref on a free-waiting owner,
-            // free the owner
+            // ..and if it was the last on a free-waiting owner, free the owner
             if (!owner->refcnt) {
                 free(DATA(owner));
                 *owner = ZERO;
@@ -246,10 +245,7 @@ bft_free (Buffet *buf)
         }   break;
 
         case SSO:
-            // If user had a view on this SSO, 
-            // it was her duty to keep it intact and in scope.
         case VUE:
-            // Idem.
             *buf = ZERO;
             break;
     }

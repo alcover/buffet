@@ -200,21 +200,37 @@ bft_print(&ref); // Bon
 
 
 ### bft_free
-If *buf* is owning data and there are no references to it (*refcnt*==0),  
-the data is released.  
-In any case, *buf* is zeroed-out, making it an empty SSO.  
 ```C
 void bft_free (Buffet *buf)
 ```
+If *buf* is not owning, it is zeroed, making it an empty SSO.  
+
+If *buf* owns data :  
+- if there are no references to *buf*, the data is released and *buf* is zeroed
+- if there are references, *buf* is just marked for release  
+
 
 ```C
-Buffet buf;
-bft_strcopy(&buf, "Too long for SSO..........", 16);
-bft_dbg(&buf);
-// type:OWN cap:32 len:16 data:'Too long for SSO'
-bft_free(&buf);
-bft_dbg(&buf);
-// type:SSO cap:14 len:0 data:''
+char text[] = "Le grand orchestre de Patato Valdez";
+
+Buffet own;
+bft_strcopy(&own, text, sizeof(text));
+bft_dbg(&own);
+// type:OWN data:'Le grand orchestre de Patato Valdez'
+
+Buffet ref = bft_view(&own, 22, 13);
+bft_dbg(&ref);
+// type:REF data:'Patato Valdez'
+
+// Too soon but marked for release
+bft_free(&own);
+bft_dbg(&own);
+// type:OWN data:'Le grand orchestre de Patato Valdez'
+
+// Release last ref, hence owner
+bft_free(&ref);
+bft_dbg(&own);
+// type:SSO data:''
 ```
 
 

@@ -24,6 +24,24 @@ int main() {
 	// ERROR SUMMARY: 0 errors 
 }
 
+{
+	// readme::bft_free
+	char text[] = "Le grand orchestre de Patato Valdez";
+	Buffet own;
+	bft_strcopy(&own, text, sizeof(text));
+	bft_dbg(&own);
+
+	Buffet ref = bft_view(&own, 22, 13);
+	bft_dbg(&ref);
+
+	// Too soon but marked for release
+	bft_free(&own);
+	bft_dbg(&own); // -> unchanged
+
+	// release last refcnt, hence release owner
+	bft_free(&ref);
+	bft_dbg(&own);	
+}
 
 // {
 // Buffet copy;
