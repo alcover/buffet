@@ -46,7 +46,6 @@ typedef union Buffet {
             struct {
                 uint16_t refcnt;
                 uint8_t  cap;
-                uint8_t  wantfree:1;
             };
         };
         intptr_t data : 8*sizeof(intptr_t)-BFT_TYPE_BITS;

@@ -36,7 +36,6 @@ nextlog2 (unsigned long long n) {
     return 8 * sizeof(unsigned long long) - __builtin_clzll(n-1);
 }
 
-
 static char*
 getdata (const Buffet *buf) 
 {
@@ -53,7 +52,6 @@ getdata (const Buffet *buf)
     return NULL;
 }
 
-
 static size_t
 getcap (const Buffet *buf, Type t) {
     return 
@@ -62,13 +60,24 @@ getcap (const Buffet *buf, Type t) {
     :   0;
 }
 
-
 // optim (!t)*ssolen + (!!t)*len
 static size_t
 getlen (const Buffet *buf) {
     return (buf->type == SSO) ? buf->ssolen : buf->len;
 }
 
+static void
+make_own (Buffet *dst, uint8_t caplog, size_t len, const char *data)
+{
+    *dst = ZERO;
+    *dst = (Buffet){
+        .len = len,
+        .cap = caplog,
+        .refcnt = 1, // init as flag : 1 == idle, 0 == marked for freeing 
+        .data = ASDATA(data),
+        .type = OWN
+    };
+}
 
 static char*
 alloc (Buffet *dst, size_t cap)
@@ -79,17 +88,10 @@ alloc (Buffet *dst, size_t cap)
 
     if (!data) {ERR("failed alloc"); return NULL;}
     
-    *dst = ZERO;
-    *dst = (Buffet){
-        .len = 0,
-        .cap = caplog,
-        .data = ASDATA(data),
-        .type = OWN
-    };
+    make_own (dst, caplog, 0, data);
 
     return data;
 }
-
 
 static char*
 grow_sso (Buffet *buf, size_t cap)
@@ -97,18 +99,14 @@ grow_sso (Buffet *buf, size_t cap)
     uint8_t caplog = nextlog2(cap+1);
     char *data = malloc(EXP(caplog));
     
-    if (!data) return NULL;
+    if (!data) {ERR("failed alloc"); return NULL;}
 
-    memcpy (data, buf->sso, buf->ssolen + 1);
-    *buf = ZERO;
-    buf->len = buf->ssolen;
-    buf->cap = caplog;
-    buf->data = ASDATA(data);
-    buf->type = OWN;
+    const size_t len = buf->ssolen;
+    memcpy (data, buf->sso, len + 1);
+    make_own (buf, caplog, len, data);
 
     return data;
 }
-
 
 static char*
 grow_own (Buffet *buf, size_t cap)
@@ -224,13 +222,13 @@ bft_free (Buffet *buf)
     switch(buf->type) {
         
         case OWN:
-            // nobody looking, we are go
-            if (!buf->refcnt) {
+            // if no ref left and owner is marked for freeing, we are go
+            // else mark owner for freeing
+            if (!(buf->refcnt-1)) {
                 free(DATA(buf));
                 *buf = ZERO;
             } else {
-            // else wait for last ref to go
-                buf->wantfree = 1;
+                -- buf->refcnt;
             }
             break;
 
@@ -238,10 +236,10 @@ bft_free (Buffet *buf)
             Buffet *owner = SRC(buf);
             *buf = ZERO;
             // tell owner it has one less ref
-            --owner->refcnt;
+            -- owner->refcnt;
             // if it was the last ref on a free-waiting owner,
             // free the owner
-            if (owner->wantfree && !owner->refcnt ) {
+            if (!owner->refcnt) {
                 free(DATA(owner));
                 *owner = ZERO;
             }
@@ -273,7 +271,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
             buf->ssolen = newlen;
         } else {
             char *data = grow_sso (buf, newlen);
-            if (!data) {ERR("grow fail"); return 0;}
+            if (!data) {return 0;}
             memcpy (data+curlen, src, srclen);
             data[newlen] = 0;
             buf->len = newlen;
@@ -288,7 +286,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
             memcpy (data+curlen, src, srclen);
         } else {
             data = grow_own (buf, newlen);
-            if (!data) {ERR("grow fail"); return 0;}
+            if (!data) {return 0;}
             memcpy (data+curlen, src, srclen);
         }
 
