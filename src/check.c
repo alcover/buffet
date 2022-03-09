@@ -21,8 +21,21 @@ exit(EXIT_FAILURE);}}
 const char alpha[] = 
 "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+=";
 const size_t alphalen = 64;
-
 char tmp[100];
+
+//==============================================================================
+static void 
+check_free (Buffet *b)
+{
+    bft_free(b);
+
+    assert_int (bft_len(b), 0);
+    assert_int (bft_cap(b), BFT_SSO_CAP);
+    assert_str (bft_data(b), "");
+    bool mustfree;
+    assert_str (bft_cstr(b,&mustfree), "");
+    assert(!mustfree);
+}
 
 static char* 
 take(size_t off, size_t len) {
@@ -44,7 +57,8 @@ check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
     if (expfree) free((char*)cstr);
 }
 
-void check_export (Buffet *b, size_t off, size_t len)
+static void 
+check_export (Buffet *b, size_t off, size_t len)
 {
     char *export = bft_export(b);
     const char *expstr = take(off,len);
@@ -53,7 +67,8 @@ void check_export (Buffet *b, size_t off, size_t len)
 }
 
 //==============================================================================
-static void u_new (size_t cap) 
+static void 
+u_new (size_t cap) 
 {
     Buffet b; 
     bft_new (&b, cap); 
@@ -67,23 +82,28 @@ static void u_new (size_t cap)
     bft_free(&b); 
 }
 
+#define u_new_around(n) \
+u_new((n)-1); \
+u_new((n)); \
+u_new((n)+1);
+
 static void new() 
 { 
     u_new (0);
     u_new (1);
     u_new (8);
-    u_new (BFT_SSO_CAP-1);
-    u_new (BFT_SSO_CAP);
-    u_new (BFT_SSO_CAP+1);
-    u_new (BFT_SIZE-1);
-    u_new (BFT_SIZE);
-    u_new (BFT_SIZE+1);
-    u_new (100);
-    u_new (UINT32_MAX);
+    u_new_around (BFT_SSO_CAP);
+    u_new_around (BFT_SIZE);
+    u_new_around (32);
+    u_new_around (64);
+    u_new_around (1024);
+    u_new_around (4096);
+    // u_new (UINT32_MAX);
 }
 
 //==============================================================================
-static void u_strcopy (size_t off, size_t len)
+static void 
+u_strcopy (size_t off, size_t len)
 {
     Buffet b;
     bft_strcopy (&b, alpha+off, len);
@@ -96,7 +116,7 @@ static void u_strcopy (size_t off, size_t len)
     bft_free(&b);
 }
 
-void strcopy() 
+static void strcopy() 
 {
     u_strcopy (0, 0); 
     u_strcopy (0, 1); 
@@ -131,7 +151,7 @@ static void u_strview (size_t off, size_t len)
     bft_free(&b);
 }
 
-void strview() 
+static void strview() 
 {
     u_strview (0, 0); 
     u_strview (0, 1); 
@@ -169,7 +189,7 @@ u_copy (size_t off, size_t len)
     bft_free(&src);
 }
 
-void copy()
+static void copy()
 {
     u_copy (0, 0); 
     u_copy (0, 1); 
@@ -243,7 +263,7 @@ u_view_vue (size_t off, size_t len)
     bft_free(&src);
 }
 
-void view()
+static void view()
 {
     // on SSO
     u_view (8, 0, 0);
@@ -268,7 +288,8 @@ void view()
 }
 
 //==============================================================================
-void u_append_new (size_t cap, size_t len)
+static void 
+u_append_new (size_t cap, size_t len)
 {
     Buffet b;
     bft_new (&b, cap);
@@ -282,7 +303,8 @@ void u_append_new (size_t cap, size_t len)
     bft_free(&b);    
 }
 
-void u_append_strcopy (size_t initlen, size_t len)
+static void 
+u_append_strcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
@@ -297,7 +319,8 @@ void u_append_strcopy (size_t initlen, size_t len)
     bft_free(&b);    
 }
 
-void u_append_strview (size_t initlen, size_t len)
+static void 
+u_append_strview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
@@ -312,7 +335,8 @@ void u_append_strview (size_t initlen, size_t len)
     bft_free(&b);    
 }
 
-void u_append_view (size_t initlen, size_t len)
+static void 
+u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet src;
@@ -329,7 +353,7 @@ void u_append_view (size_t initlen, size_t len)
     bft_free(&b);    
 }
 
-void append()
+static void append()
 {
     u_append_new (0, 0);
     u_append_new (0, 8);
@@ -363,25 +387,65 @@ void append()
 }
 
 //==============================================================================
-void free_()
+static void free_()
 {
+    {
+        Buffet b; 
+        bft_new (&b, 10); 
+        check_free(&b);
+    }
+    {
+        Buffet b; 
+        bft_strcopy (&b, alpha, 10); 
+        check_free(&b);
+    }
+    {
+        Buffet b; 
+        bft_strcopy (&b, alpha, 40); 
+        check_free(&b);
+    }
+    {
+        Buffet b; 
+        bft_strview (&b, alpha, 10); 
+        check_free(&b);
+    }
+    {
+        Buffet own;
+        bft_strcopy (&own, alpha, 40);
+        Buffet ref = bft_view (&own, 10, 4); 
+        check_free(&ref);
+        bft_free(&own);
+    }
+    {
+        Buffet own;
+        bft_strcopy (&own, alpha, 40);
+        Buffet cpy = bft_copy (&own, 10, 4); 
+        check_free(&cpy);
+        bft_free(&own);
+    }
 
+    {   // double free
+        Buffet b; 
+        bft_strcopy (&b, alpha, 40); 
+        check_free(&b);
+        check_free(&b);
+    }
 }
-//==============================================================================
 
-// #define run(fun) printf("%s ",#fun); fflush(stdout); fun(); puts("OK");
-#define run(fun) fun();
+//==============================================================================
 
 int main()
 {
-    run(new)
-    run(strcopy)
-    run(strview)
-    run(copy)
-    run(view)
-    run(append)
-    run(free_)
+    printf ("unit tests... ");    
 
-    printf ("unit tests OK\n");
+    new();
+    strcopy();
+    strview();
+    copy();
+    view();
+    append();
+    free_();
+
+    printf ("OK\n");
     return 0;
 }
