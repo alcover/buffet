@@ -29,6 +29,8 @@ typedef enum {
 // check if pointer is safely aligned to be shifted for 62 bits
 #define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<BFT_TYPE_BITS));
 
+const int refcnt_max = (1ull << 8 * sizeof((Buffet){}.refcnt)) - 2;
+
 //==============================================================================
 
 static unsigned int 
@@ -195,21 +197,29 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
         case SSO:
         case VUE: {
             const char* data = getdata(src); 
-            bft_strview (&ret, data + off, len); }
-            break;
+            bft_strview (&ret, data + off, len); 
+        }   break;
         
-        case OWN:
-            ret.data = ASDATA(src);
-            ret.off = off;
-            ret.len = len;
-            ret.type = REF;     
-            ++ src->refcnt;
-            break;
+        case OWN: {
+            if (src->refcnt < refcnt_max) {
+                // if refcnt field is not full, make a REF...
+                ret.data = ASDATA(src);
+                ret.off = off;
+                ret.len = len;
+                ret.type = REF;     
+                ++ src->refcnt;
+            } else {
+                // ...else make a copy ?
+                // or empty SSO ?
+                const char* data = getdata(src); 
+                bft_strcopy (&ret, data + off, len);
+            }
+        }   break;
         
         case REF: {
             Buffet* ref = SRC(src);
-            ret = bft_view (ref, src->off + off, len); }
-            break;
+            ret = bft_view (ref, src->off + off, len);
+        }   break;
     }
 
     return ret;
