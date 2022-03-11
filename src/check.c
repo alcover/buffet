@@ -263,6 +263,7 @@ u_view_vue (size_t off, size_t len)
     bft_free(&src);
 }
 
+// TODO fill-up refcnt
 static void view()
 {
     // on SSO
@@ -288,6 +289,8 @@ static void view()
 }
 
 //==============================================================================
+// Confusing and certainly not covering all paths..
+
 static void 
 u_append_new (size_t cap, size_t len)
 {
@@ -341,16 +344,16 @@ u_append_view (size_t initlen, size_t len)
     size_t totlen = initlen+len;
     Buffet src;
     bft_strcopy (&src, alpha, initlen);
-    Buffet b = bft_view (&src, 0, initlen);
-    bft_append (&b, alpha+initlen, len);
+    Buffet ref = bft_view (&src, 0, initlen);
+    bft_append (&ref, alpha+initlen, len);
 
-    assert_int (bft_len(&b), totlen);
-    assert_strn (bft_data(&b), alpha, totlen);
-    check_cstr (&b, 0, totlen, false);
-    check_export (&b, 0, totlen);
+    assert_int (bft_len(&ref), totlen);
+    assert_strn (bft_data(&ref), alpha, totlen);
+    check_cstr (&ref, 0, totlen, false);
+    check_export (&ref, 0, totlen);
     
-    bft_free(&b); 
-    bft_free(&b);    
+    bft_free(&ref); 
+    bft_free(&src);    
 }
 
 static void append()
@@ -383,7 +386,9 @@ static void append()
     u_append_strview (8, 20);
     u_append_strview (20, 20);
 
-    u_append_view (8, 8);
+    u_append_view (8, 4);
+    u_append_view (8, 20);
+    u_append_view (20, 20);
 }
 
 //==============================================================================
