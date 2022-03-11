@@ -1,12 +1,13 @@
-![schema](assets/buffet.png)  
-
 # Buffet
-All-inclusive Buffer for C  
+
+*All-inclusive Buffer for C*  
 (Unit-tested but not yet stable, optimized or feature-complete)  
+
+:orange_book: [API](#API)  
 
 ![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
 
-:orange_book: [API](#API)
+![schema](assets/buffet.png)  
 
 *Buffet* is a versatile string buffer type featuring
 - automated storage and reallocation  

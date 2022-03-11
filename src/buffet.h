@@ -29,7 +29,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 typedef union Buffet {
 
-    // init
+    // for zero-init
     char fill[BFT_SIZE];
     
     // embed
@@ -58,9 +58,9 @@ typedef union Buffet {
 void    bft_new (Buffet *dst, size_t cap);
 void    bft_strcopy (Buffet *dst, const char *src, size_t len);
 void    bft_strview (Buffet *dst, const char *src, size_t len);
-size_t  bft_append  (Buffet *dst, const char *src, size_t len);
 Buffet  bft_copy (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  bft_view (Buffet *src, ptrdiff_t off, size_t len);
+Buffet  bft_view (      Buffet *src, ptrdiff_t off, size_t len);
+size_t  bft_append (Buffet *dst, const char *src, size_t len);
 void    bft_free (Buffet *buf);
 
 size_t  bft_cap (const Buffet *buf);
