@@ -276,7 +276,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
             buf->sso[newlen] = 0;
             buf->ssolen = newlen;
         } else {
-            char *data = grow_sso (buf, newlen);
+            char *data = grow_sso(buf, newlen);
             if (!data) {return 0;}
             memcpy (data+curlen, src, srclen);
             data[newlen] = 0;
@@ -285,17 +285,9 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 
     } else if (type==OWN) {
 
-        char *data;
-
-        if (newlen <= buf->cap) {
-            data = DATA(buf);
-            memcpy (data+curlen, src, srclen);
-        } else {
-            data = grow_own (buf, newlen);
-            if (!data) {return 0;}
-            memcpy (data+curlen, src, srclen);
-        }
-
+        char *data = (newlen <= buf->cap) ? DATA(buf) : grow_own(buf, newlen);
+        if (!data) {return 0;}
+        memcpy (data+curlen, src, srclen);
         data[newlen] = 0;
         buf->len = newlen;
 
@@ -303,7 +295,6 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 
         const char *curdata = getdata(buf);
         Buffet *ref = SRC(buf);
-
         bft_strcopy (buf, curdata, curlen); 
         if (type == REF) --ref->refcnt;
         bft_append (buf, src, srclen);
