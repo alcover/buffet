@@ -27,30 +27,45 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define BFT_SSO_CAP (BFT_SIZE-2) // leaving room for NUL & flags
 #define BFT_TYPE_BITS 2
 
+
+// typedef struct Buffet {
 typedef union Buffet {
 
-    // for zero-init
-    char fill[BFT_SIZE];
+    // zero-init
+    // char fill[BFT_SIZE];
     
-    // embed
-    struct {
-        char    sso[BFT_SIZE-1];
-        uint8_t ssolen:4, :4;
-    };
-    
-    // reference
-    struct { 
-        uint32_t len; 
-        union {
+    // union {
+
+        struct {
+            char     data[BFT_SIZE-1];
+            uint8_t  len:6; // use imposs val as neg flag ?
+            uint8_t  type:2;
+        } sso;
+        
+        struct {
+            char*    data;
+            uint32_t len;
+            // vue: unused cap => magic flag !
+            uint32_t cap:30;
+            uint8_t  type:2;
+        } ptr; // own/vue
+
+        struct {
+            uint32_t len;
             uint32_t off;
-            struct {
-                uint16_t refcnt;
-                uint8_t  cap;
-            };
-        };
-        intptr_t data : 8*sizeof(intptr_t)-BFT_TYPE_BITS;
-        uint8_t  type : BFT_TYPE_BITS;
-    };
+            intptr_t data:62;
+            uint8_t  type:2;
+        } ref; 
+
+        // struct {
+        //     char*    data;
+        //     uint32_t len;
+        //     uint32_t pad:30; 
+        //     uint8_t  type:2;
+        // } vue;
+    // };
+    
+    // uint8_t type:2;
 
 } Buffet;
 
