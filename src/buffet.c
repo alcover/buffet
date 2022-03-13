@@ -20,11 +20,9 @@ typedef enum {
     VUE
 } Type;
 
-#define REFC_T uint64_t
-
 typedef struct {
     Buffet* owner;
-    REFC_T  refcnt; 
+    uint64_t  refcnt; 
     char    data[8];
 } Store;
 
@@ -33,7 +31,6 @@ typedef struct {
 #define DATAOFF (offsetof(Store, data))
 #define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
 #define STEP (1ull<<BFT_TYPE_BITS)
-// #define ZERO ((Buffet){.sso.data={0}, .sso.len=0, .sso.type=SSO})
 #define ZERO ((Buffet){.fill={0}})
 #define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
 
@@ -48,7 +45,6 @@ getdata (const Buffet *buf)
         case OWN:
         case VUE:
         case REF:
-            // return REFDATA(buf);
             return buf->ptr.data;
     }
     return NULL;
@@ -80,8 +76,6 @@ getstore(Buffet *buf)
 static void
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 {
-    // *dst = ZERO;
-
     cap = cap+1; //?
     if (cap % STEP) cap = (cap/STEP+1) * STEP; // round to next STEP
 
@@ -120,16 +114,16 @@ grow_sso (Buffet *buf, size_t newcap)
 static char*
 grow_own (Buffet *buf, size_t newcap)
 {
-    Store *store = getstore(buf); //(Store*)(buf->ptr.data-DATAOFF);
+    Store *store = getstore(buf);
     
     store = realloc(store, DATAOFF + newcap + 1);
     if (!store) return NULL;
-    // since there is no aligned_realloc()...
+
     char *newdata = store->data;
     assert_aligned(newdata);
 
     buf->ptr.data = newdata;
-    buf->ptr.aux = newcap/STEP; // verif
+    buf->ptr.aux = newcap/STEP; // ?
 
     return newdata;
 }
@@ -203,8 +197,6 @@ view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len)
         .ptr.type = REF     
     };
 
-    // REFC_T *refcnt = (REFC_T*)(ownerdata-DATAOFF);
-    // ++ *refcnt;
     Store *store = (Store*)(ownerdata-DATAOFF);
     ++ store->refcnt;
 }
@@ -229,7 +221,6 @@ bft_view (const Buffet *src, ptrdiff_t off, size_t len)
         
         case REF: {
             uint32_t refoff = REFOFF(src);
-            //(char*)(((intptr_t)src->ptr.data >> 2) << 2);
             const char *ownerdata = data - refoff; 
             view_data (&ret, ownerdata, refoff + off, len);
         }   break;
