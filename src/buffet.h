@@ -27,46 +27,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #define BFT_SSO_CAP (BFT_SIZE-2) // leaving room for NUL & flags
 #define BFT_TYPE_BITS 2
 
-
-// typedef struct Buffet {
 typedef union Buffet {
-
-    // zero-init
-    // char fill[BFT_SIZE];
-    
-    // union {
-
-        struct {
-            char     data[BFT_SIZE-1];
-            uint8_t  len:6; // use imposs val as neg flag ?
-            uint8_t  type:2;
-        } sso;
         
-        struct {
-            char*    data;
-            uint32_t len;
-            // vue: unused cap => magic flag !
-            uint32_t cap:30;
-            uint8_t  type:2;
-        } ptr; // own/vue
+    struct {
+        char*    data;
+        uint32_t len;
+        // vue: unused cap => magic flag !
+        uint32_t aux:30;
+        uint8_t  type:2;
+    } ptr;
 
-        struct {
-            uint32_t len;
-            uint32_t off;
-            intptr_t data:62;
-            uint8_t  type:2;
-        } ref; 
+    struct {
+        char     data[BFT_SIZE-1];
+        uint8_t  len:6; // use imposs val as neg flag ?
+        uint8_t  type:2;
+    } sso;
 
-        // struct {
-        //     char*    data;
-        //     uint32_t len;
-        //     uint32_t pad:30; 
-        //     uint8_t  type:2;
-        // } vue;
-    // };
-    
-    // uint8_t type:2;
-
+    char fill[BFT_SIZE];
+ 
 } Buffet;
 
 
@@ -74,7 +52,7 @@ void    bft_new (Buffet *dst, size_t cap);
 void    bft_strcopy (Buffet *dst, const char *src, size_t len);
 void    bft_strview (Buffet *dst, const char *src, size_t len);
 Buffet  bft_copy (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  bft_view (      Buffet *src, ptrdiff_t off, size_t len);
+Buffet  bft_view (const Buffet *src, ptrdiff_t off, size_t len);
 size_t  bft_append (Buffet *dst, const char *src, size_t len);
 void    bft_free (Buffet *buf);
 
