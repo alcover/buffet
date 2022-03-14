@@ -24,7 +24,7 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdbool.h>
 
 #define BFT_SIZE 16
-#define BFT_SSO_CAP (BFT_SIZE-2) // leaving room for NUL & flags
+#define BFT_SSO_CAP (BFT_SIZE-2)
 #define BFT_TYPE_BITS 2
 
 typedef union Buffet {
@@ -32,15 +32,12 @@ typedef union Buffet {
     struct {
         char*    data;
         uint32_t len;
-        // vue: unused cap => magic flag !
-        uint32_t aux:30;
-        uint8_t  type:2;
+        uint32_t aux:30, type:2;
     } ptr;
 
     struct {
         char     data[BFT_SIZE-1];
-        uint8_t  len:6; // use imposs val as neg flag ?
-        uint8_t  type:2;
+        uint8_t  len:6, type:2;
     } sso;
 
     char fill[BFT_SIZE];

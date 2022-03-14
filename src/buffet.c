@@ -7,7 +7,6 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include "buffet.h"
 #include "log.h"
 
@@ -25,58 +24,45 @@ typedef struct {
     char    data[8];
 } Store;
 
-
-#define TYPE(buf) ((buf)->sso.type)
-#define DATAOFF (offsetof(Store, data))
-#define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
 #define STEP (1ull<<BFT_TYPE_BITS)
 #define ZERO ((Buffet){.fill={0}})
+#define DATAOFF offsetof(Store,data)
+#define TYPE(buf) ((buf)->sso.type)
+#define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
 #define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
 
-//=============================================================================
-
 static const char*
-getdata (const Buffet *buf) 
-{
-    switch (TYPE(buf)) {
-        case SSO:
-            return buf->sso.data;
-        case OWN:
-        case VUE:
-        case REF:
-            return buf->ptr.data;
-    }
-    return NULL;
+getdata (const Buffet *buf) {
+    return TYPE(buf) ? buf->ptr.data : buf->sso.data;
 }
 
-// todo opt or localize
 static size_t
 getlen (const Buffet *buf) {
     return TYPE(buf) ? buf->ptr.len : buf->sso.len;
 }
 
 static size_t
-getcap (const Buffet *buf, Type t) {
+getcap (const Buffet *buf, Type type) {
     return 
-        t == OWN ? (STEP * buf->ptr.aux)
-    :   t == SSO ? BFT_SSO_CAP
+        type == OWN ? (STEP * buf->ptr.aux)
+    :   type == SSO ? BFT_SSO_CAP
     :   0;
 }
 
 static Store*
-getstore(Buffet *buf) 
+getstore (Buffet *buf, Type type) 
 {
-    const Type type = TYPE(buf);
     const char *data = getdata(buf);
     if (type==REF) data -= REFOFF(buf);
-    return (Store*)(data - DATAOFF);
+    return (Store*)(data-DATAOFF);
 }
+
 
 static void
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 {
     cap = cap+1; //?
-    if (cap % STEP) cap = (cap/STEP+1) * STEP; // round to next STEP
+    if (cap % STEP) cap = (cap/STEP+1)*STEP; // round to next STEP
 
     Store *store = aligned_alloc(BFT_SIZE, DATAOFF + cap + 1); //1?
     if (!store) {ERR("failed allocation"); return;}
@@ -100,9 +86,7 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 static char*
 grow_sso (Buffet *buf, size_t newcap)
 {
-    size_t len = buf->sso.len;
     Buffet dst;
-
     new_own (&dst, newcap, buf->sso.data, buf->sso.len);
     *buf = dst;
 
@@ -112,14 +96,13 @@ grow_sso (Buffet *buf, size_t newcap)
 static char*
 grow_own (Buffet *buf, size_t newcap)
 {
-    Store *store = getstore(buf);
+    Store *store = getstore(buf, OWN);
     
     store = realloc(store, DATAOFF + newcap + 1);
     if (!store) return NULL;
 
     char *newdata = store->data;
     assert_aligned(newdata);
-
     buf->ptr.data = newdata;
     buf->ptr.aux = newcap/STEP; // ?
 
@@ -233,9 +216,15 @@ bft_free (Buffet *buf)
 {
     const Type type = TYPE(buf);
 
+    if (type == SSO || type == VUE) {
+        *buf = ZERO;
+        return;
+    }
+        
+    Store *store = getstore(buf, type);
+    
     if (type == OWN) {
 
-        Store *store = getstore(buf);
         if (!(store->refcnt-1)) {
             free(store);
             *buf = ZERO;
@@ -243,17 +232,12 @@ bft_free (Buffet *buf)
             -- store->refcnt;
         }
 
-    } else if (type == REF) {
+    } else { // REF
 
-        Store *store = getstore(buf);
         *buf = ZERO;
-        -- store->refcnt;
-        if (!store->refcnt) {
+        if (!--store->refcnt) {
             free(store);
         }
-
-    } else {
-        *buf = ZERO;
     }
 }
 
@@ -292,7 +276,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 
     } else if (type==REF) {
 
-        Store *store = getstore(buf);
+        Store *store = getstore(buf, type);
         bft_strcopy (buf, curdata, curlen); 
         -- store->refcnt;
         bft_append (buf, src, srclen);
