@@ -32,12 +32,12 @@ typedef union Buffet {
     struct {
         char*    data;
         uint32_t len;
-        uint32_t aux:30, type:2;
+        uint32_t aux:32-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
     } ptr;
 
     struct {
         char     data[BFT_SIZE-1];
-        uint8_t  len:6, type:2;
+        uint8_t  len:8-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
     } sso;
 
     char fill[BFT_SIZE];
