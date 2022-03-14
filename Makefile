@@ -1,5 +1,5 @@
 CC = gcc
-OPTIM = -O2
+OPTIM = -Og
 WARN = -Wall -Wextra -Wno-unused-function -Wno-unused-variable 
 CP = $(CC) -std=c11 $(OPTIM) $(WARN) -g
 LINK = $(CP) $^ -o $@

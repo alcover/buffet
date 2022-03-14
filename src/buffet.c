@@ -7,7 +7,6 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-
 #include "buffet.h"
 #include "log.h"
 
@@ -20,123 +19,118 @@ typedef enum {
     VUE
 } Type;
 
-#define EXP(v) (1ull << (v))
-#define ASDATA(ptr) ((intptr_t)(ptr) >> BFT_TYPE_BITS)
-#define DATA(buf) ((char*)((intptr_t)((buf)->data) << BFT_TYPE_BITS))
-#define SRC(view) ((Buffet*)(DATA(view)))
+typedef struct {
+    uint64_t  refcnt; 
+    char    data[8];
+} Store;
+
+#define OVERALLOC 1.6
+#define STEP (1ull<<BFT_TYPE_BITS)
 #define ZERO ((Buffet){.fill={0}})
+#define DATAOFF offsetof(Store,data)
+#define TYPE(buf) ((buf)->sso.type)
+#define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
+#define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
 
-// check if pointer is safely aligned to be shifted for 62 bits
-#define assert_aligned(p) assert(0 == (intptr_t)(p) % (1ull<<BFT_TYPE_BITS));
-
-const int refcnt_max = (1ull << 8 * sizeof((Buffet){}.refcnt)) - 2;
-
-//==============================================================================
-
-static unsigned int 
-nextlog2 (unsigned long long n) {
-    return 8 * sizeof(unsigned long long) - __builtin_clzll(n-1);
-}
-
-static char*
-getdata (const Buffet *buf) 
-{
-    switch(buf->type) {
-        case SSO:
-            return (char*)buf->sso;
-        case OWN:
-            return DATA(buf);
-        case VUE:
-            return DATA(buf) + buf->off;
-        case REF:
-            return DATA(SRC(buf)) + buf->off;
-    }
-    return NULL;
+static const char*
+getdata (const Buffet *buf) {
+    return TYPE(buf) ? buf->ptr.data : buf->sso.data;
 }
 
 static size_t
-getcap (const Buffet *buf, Type t) {
+getlen (const Buffet *buf) {
+    return TYPE(buf) ? buf->ptr.len : buf->sso.len;
+}
+
+static size_t
+getcap (const Buffet *buf, Type type) {
     return 
-        t == OWN ? (1ull << buf->cap)
-    :   t == SSO ? BFT_SSO_CAP
+        type == OWN ? (STEP * buf->ptr.aux)
+    :   type == SSO ? BFT_SSO_CAP
     :   0;
 }
 
-// optim (!t)*ssolen + (!!t)*len
-static size_t
-getlen (const Buffet *buf) {
-    return (buf->type == SSO) ? buf->ssolen : buf->len;
+static Store*
+getstore (Buffet *buf, Type type) 
+{
+    const char *data = getdata(buf);
+    if (type==REF) data -= REFOFF(buf);
+    return (Store*)(data-DATAOFF);
 }
 
+
 static void
-make_own (Buffet *dst, uint8_t caplog, size_t len, const char *data)
+new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 {
-    *dst = ZERO;
-    *dst = (Buffet){
-        .len = len,
-        .cap = caplog,
-        .refcnt = 1, // init as flag : 1 == idle, 0 == marked for freeing 
-        .data = ASDATA(data),
-        .type = OWN
+    cap = cap+1; //?
+    if (cap % STEP) cap = (cap/STEP+1)*STEP; // round to next STEP
+
+    Store *store = aligned_alloc(BFT_SIZE, DATAOFF + cap + 1); //1?
+    if (!store) {ERR("failed allocation"); return;}
+    *store = (Store){
+        .refcnt = 1,
+        .data = {'\0'}
+    };
+
+    char *data = store->data;
+    if (src) memcpy(data, src, len);
+    data[len] = 0;
+
+    *dst = (Buffet) {
+        .ptr.data = data,
+        .ptr.len = len,
+        .ptr.aux = cap/STEP,
+        .ptr.type = OWN
     };
 }
 
 static char*
-alloc (Buffet *dst, size_t cap)
+grow_sso (Buffet *buf, size_t newcap)
 {
-    const uint8_t caplog = nextlog2(cap+1);
-    size_t mem = EXP(caplog);
-    char *data = aligned_alloc(BFT_SIZE, mem);
+    Buffet dst;
+    new_own (&dst, newcap, buf->sso.data, buf->sso.len);
+    *buf = dst;
 
-    if (!data) {ERR("failed alloc"); return NULL;}
-    
-    make_own (dst, caplog, 0, data);
-
-    return data;
+    return buf->ptr.data; //?
 }
 
 static char*
-grow_sso (Buffet *buf, size_t cap)
+grow_own (Buffet *buf, size_t newcap)
 {
-    uint8_t caplog = nextlog2(cap+1);
-    char *data = malloc(EXP(caplog));
+    Store *store = getstore(buf, OWN);
     
-    if (!data) {ERR("failed alloc"); return NULL;}
+    store = realloc(store, DATAOFF + newcap + 1);
+    if (!store) return NULL;
 
-    const size_t len = buf->ssolen;
-    memcpy (data, buf->sso, len + 1);
-    make_own (buf, caplog, len, data);
+    char *newdata = store->data;
+    assert_aligned(newdata);
+    buf->ptr.data = newdata;
+    buf->ptr.aux = newcap/STEP; // ?
 
-    return data;
+    return newdata;
 }
 
-static char*
-grow_own (Buffet *buf, size_t cap)
-{
-    uint8_t caplog = nextlog2(cap+1);
-    char *data = realloc(DATA(buf), EXP(caplog));
-
-    if (!data) return NULL;
-    // since there is no aligned_realloc()...
-    assert_aligned(data);
-
-    buf->data = ASDATA(data);
-    buf->cap = caplog;
-
-    return data;
+static void
+print_type (Buffet *buf, char *out) {
+    switch(TYPE(buf)) {
+        case SSO: sprintf(out,"SSO"); break;
+        case OWN: sprintf(out,"OWN"); break;
+        case REF: sprintf(out,"REF"); break;
+        case VUE: sprintf(out,"VUE"); break;
+    }
 }
 
-//==============================================================================
+//=============================================================================
+// Public
+//=============================================================================
 
 void
 bft_new (Buffet *dst, size_t cap)
 {
-    *dst = ZERO; //sure init? see below
+    *dst = ZERO;
 
     if (cap > BFT_SSO_CAP) {
-        char* data = alloc(dst, cap);
-        if (!data) return;
-        data[0] = 0;
+        new_own(dst, cap, NULL, 0);
     }
 }
 
@@ -144,24 +138,13 @@ bft_new (Buffet *dst, size_t cap)
 void
 bft_strcopy (Buffet *dst, const char* src, size_t len)
 {
-    // TODO check ! 
-    // - warrant real zeroes
-    // - C spec read union field w/o setting it explicitly 
     *dst = ZERO;
     
     if (len <= BFT_SSO_CAP) {
-
-        memcpy(dst->sso, src, len);
-        dst->sso[len] = 0; // redundant if zero-init
-        dst->ssolen = len;
-    
+        memcpy(dst->sso.data, src, len);
+        dst->sso.len = len;
     } else {
-    
-        char* data = alloc(dst, len);
-        if (!data) return;
-        memcpy(data, src, len);
-        data[len] = 0;
-        dst->len = len;
+        new_own(dst, len, src, len); //?
     }
 }
 
@@ -169,12 +152,11 @@ bft_strcopy (Buffet *dst, const char* src, size_t len)
 void
 bft_strview (Buffet *dst, const char* src, size_t len)
 {
-    *dst = ZERO;
-    // save remainder before src address is shifted.
-    dst->off = (intptr_t)src % (1 << BFT_TYPE_BITS);
-    dst->data = ASDATA(src);
-    dst->len = len;
-    dst->type = VUE;
+    *dst = (Buffet) {
+        .ptr.data = (char*)src,
+        .ptr.len = len,
+        .ptr.type = VUE
+    };
 }
 
 
@@ -187,38 +169,42 @@ bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
-Buffet
-bft_view (Buffet *src, ptrdiff_t off, size_t len)
+static void
+view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len) 
 {
-    Buffet ret = ZERO;
+    *dst = (Buffet) {
+        .ptr.data = (char*)(ownerdata + off),
+        .ptr.len = len,
+        .ptr.aux = off/STEP,
+        .ptr.type = REF     
+    };
+
+    Store *store = (Store*)(ownerdata-DATAOFF);
+    ++ store->refcnt;
+}
+
+
+Buffet
+bft_view (const Buffet *src, ptrdiff_t off, size_t len)
+{
+    const char *data = getdata(src); 
+    Buffet ret;// = ZERO;
     
-    switch(src->type) {
+    switch(TYPE(src)) {
         
         case SSO:
         case VUE: {
-            const char* data = getdata(src); 
             bft_strview (&ret, data + off, len); 
         }   break;
         
         case OWN: {
-            if (src->refcnt < refcnt_max) {
-                // if refcnt field is not full, make a REF...
-                ret.data = ASDATA(src);
-                ret.off = off;
-                ret.len = len;
-                ret.type = REF;     
-                ++ src->refcnt;
-            } else {
-                // ...else make a copy ?
-                // or empty SSO ?
-                const char* data = getdata(src); 
-                bft_strcopy (&ret, data + off, len);
-            }
+            view_data (&ret, data, off, len);
         }   break;
         
         case REF: {
-            Buffet* ref = SRC(src);
-            ret = bft_view (ref, src->off + off, len);
+            uint32_t refoff = REFOFF(src);
+            const char *ownerdata = data-refoff; 
+            view_data (&ret, ownerdata, refoff+off, len);
         }   break;
     }
 
@@ -229,35 +215,30 @@ bft_view (Buffet *src, ptrdiff_t off, size_t len)
 void
 bft_free (Buffet *buf)
 {
-    switch(buf->type) {
+    const Type type = TYPE(buf);
+
+    if (type == SSO || type == VUE) {
+        *buf = ZERO;
+        return;
+    }
         
-        case OWN:
-            // if no ref left and owner is marked for release, we are go.
-            // else mark owner for release
-            if (!(buf->refcnt-1)) {
-                free(DATA(buf));
-                *buf = ZERO;
-            } else {
-                -- buf->refcnt;
-            }
-            break;
+    Store *store = getstore(buf, type);
+    
+    if (type == OWN) {
 
-        case REF: {
-            Buffet *owner = SRC(buf);
+        if (!(store->refcnt-1)) {
+            free(store);
             *buf = ZERO;
-            // tell owner it has one less ref..
-            -- owner->refcnt;
-            // ..and if it was the last on a free-waiting owner, free the owner
-            if (!owner->refcnt) {
-                free(DATA(owner));
-                *owner = ZERO;
-            }
-        }   break;
+        } else {
+            --store->refcnt;
+        }
 
-        case SSO:
-        case VUE:
-            *buf = ZERO;
-            break;
+    } else { // REF
+
+        *buf = ZERO;
+        if (!--store->refcnt) {
+            free(store);
+        }
     }
 }
 
@@ -265,38 +246,45 @@ bft_free (Buffet *buf)
 size_t 
 bft_append (Buffet *buf, const char *src, size_t srclen) 
 {
-    const Type type = buf->type;
+    const Type type = TYPE(buf);
     const size_t curlen = getlen(buf);
+    const size_t curcap = getcap(buf, type);
+    const char *curdata = getdata(buf);
     size_t newlen = curlen + srclen;
+    size_t newcap = OVERALLOC*newlen;
 
     if (type==SSO) {
 
-        if (newlen <= BFT_SSO_CAP) {
-            memcpy (buf->sso+curlen, src, srclen);
-            buf->sso[newlen] = 0;
-            buf->ssolen = newlen;
+        if (newlen <= curcap) {
+            memcpy (buf->sso.data+curlen, src, srclen);
+            buf->sso.data[newlen] = 0;
+            buf->sso.len = newlen;
         } else {
-            char *data = grow_sso(buf, newlen);
+            char *data = grow_sso(buf, newcap);
             if (!data) {return 0;}
             memcpy (data+curlen, src, srclen);
             data[newlen] = 0;
-            buf->len = newlen;
+            buf->ptr.len = newlen;
         }
 
     } else if (type==OWN) {
 
-        char *data = (newlen <= buf->cap) ? DATA(buf) : grow_own(buf, newlen);
+        char *data = (newlen <= curcap) ? buf->ptr.data : grow_own(buf, newcap);
         if (!data) {return 0;}
         memcpy (data+curlen, src, srclen);
         data[newlen] = 0;
-        buf->len = newlen;
+        buf->ptr.len = newlen;
+
+    } else if (type==REF) {
+
+        Store *store = getstore(buf, type);
+        bft_strcopy (buf, curdata, curlen); 
+        -- store->refcnt;
+        bft_append (buf, src, srclen);
 
     } else {
 
-        const char *curdata = getdata(buf);
-        Buffet *ref = SRC(buf);
         bft_strcopy (buf, curdata, curlen); 
-        if (type == REF) --ref->refcnt;
         bft_append (buf, src, srclen);
     }
 
@@ -304,14 +292,14 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 }
 
 
-// todo no alloc if ref/vue whole len or stops at end
+// todo no allocation if ref/vue whole len or stops at end
 const char*
 bft_cstr (const Buffet *buf, bool *mustfree) 
 {
     const char *data = getdata(buf);
     *mustfree = false;
 
-    switch(buf->type) {
+    switch(TYPE(buf)) {
         
         case SSO:
         case OWN:
@@ -319,11 +307,11 @@ bft_cstr (const Buffet *buf, bool *mustfree)
         
         case VUE:
         case REF: {
-            const size_t len = buf->len;
+            const size_t len = buf->ptr.len;
             char* ret = malloc(len+1);
 
             if (!ret) {
-                ERR("failed alloc"); 
+                ERR("failed allocation"); 
                 *mustfree = true;
                 return calloc(1,1);
             }
@@ -347,7 +335,7 @@ bft_export (const Buffet* buf)
     char* ret = malloc(len+1);
 
     if (!ret) {
-        ERR("failed alloc"); 
+        ERR("failed allocation"); 
         return calloc(1,1);
     }
     
@@ -364,22 +352,12 @@ bft_data (const Buffet* buf) {
 
 size_t
 bft_cap (const Buffet* buf) {
-    return getcap(buf, buf->type);
+    return getcap(buf, TYPE(buf));
 }
 
 size_t
 bft_len (const Buffet* buf) {
     return getlen(buf);
-}
-
-static void
-print_type (Buffet *buf, char *out) {
-    switch(buf->type) {
-        case SSO: sprintf(out,"SSO"); break;
-        case OWN: sprintf(out,"OWN"); break;
-        case REF: sprintf(out,"REF"); break;
-        case VUE: sprintf(out,"VUE"); break;
-    }
 }
 
 void

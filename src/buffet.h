@@ -24,34 +24,24 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdbool.h>
 
 #define BFT_SIZE 16
-#define BFT_SSO_CAP (BFT_SIZE-2) // leaving room for NUL & flags
+#define BFT_SSO_CAP (BFT_SIZE-2)
 #define BFT_TYPE_BITS 2
 
 typedef union Buffet {
-
-    // for zero-init
-    char fill[BFT_SIZE];
-    
-    // embed
+        
     struct {
-        char    sso[BFT_SIZE-1];
-        uint8_t ssolen:4, :4;
-    };
-    
-    // reference
-    struct { 
-        uint32_t len; 
-        union {
-            uint32_t off;
-            struct {
-                uint16_t refcnt;
-                uint8_t  cap;
-            };
-        };
-        intptr_t data : 8*sizeof(intptr_t)-BFT_TYPE_BITS;
-        uint8_t  type : BFT_TYPE_BITS;
-    };
+        char*    data;
+        uint32_t len;
+        uint32_t aux:32-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
+    } ptr;
 
+    struct {
+        char     data[BFT_SIZE-1];
+        uint8_t  len:8-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
+    } sso;
+
+    char fill[BFT_SIZE];
+ 
 } Buffet;
 
 
@@ -59,7 +49,7 @@ void    bft_new (Buffet *dst, size_t cap);
 void    bft_strcopy (Buffet *dst, const char *src, size_t len);
 void    bft_strview (Buffet *dst, const char *src, size_t len);
 Buffet  bft_copy (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  bft_view (      Buffet *src, ptrdiff_t off, size_t len);
+Buffet  bft_view (const Buffet *src, ptrdiff_t off, size_t len);
 size_t  bft_append (Buffet *dst, const char *src, size_t len);
 void    bft_free (Buffet *buf);
 
