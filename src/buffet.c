@@ -24,6 +24,7 @@ typedef struct {
     char    data[8];
 } Store;
 
+#define OVERALLOC 1.6
 #define STEP (1ull<<BFT_TYPE_BITS)
 #define ZERO ((Buffet){.fill={0}})
 #define DATAOFF offsetof(Store,data)
@@ -174,7 +175,7 @@ view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len)
     *dst = (Buffet) {
         .ptr.data = (char*)(ownerdata + off),
         .ptr.len = len,
-        .ptr.aux = off/STEP, //shift?
+        .ptr.aux = off/STEP,
         .ptr.type = REF     
     };
 
@@ -202,8 +203,8 @@ bft_view (const Buffet *src, ptrdiff_t off, size_t len)
         
         case REF: {
             uint32_t refoff = REFOFF(src);
-            const char *ownerdata = data - refoff; 
-            view_data (&ret, ownerdata, refoff + off, len);
+            const char *ownerdata = data-refoff; 
+            view_data (&ret, ownerdata, refoff+off, len);
         }   break;
     }
 
@@ -229,7 +230,7 @@ bft_free (Buffet *buf)
             free(store);
             *buf = ZERO;
         } else {
-            -- store->refcnt;
+            --store->refcnt;
         }
 
     } else { // REF
@@ -250,7 +251,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
     const size_t curcap = getcap(buf, type);
     const char *curdata = getdata(buf);
     size_t newlen = curlen + srclen;
-    size_t newcap = 2*newlen;
+    size_t newcap = OVERALLOC*newlen;
 
     if (type==SSO) {
 

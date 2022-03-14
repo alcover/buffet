@@ -18,6 +18,14 @@ Buffet pass_owner(){
 
 int main() {
 
+	#define MUL 1.618033988749
+	size_t a=2;
+	for (int i = 0; i < 10; ++i)
+	{
+		a *= MUL;
+		LOGVI(a);
+	}
+
 // {
 // 	Buffet own;
 // 	bft_strcopy (&own, alpha, 40);
