@@ -21,7 +21,6 @@ typedef enum {
 } Type;
 
 typedef struct {
-    Buffet* owner;
     uint64_t  refcnt; 
     char    data[8];
 } Store;
@@ -82,7 +81,6 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
     Store *store = aligned_alloc(BFT_SIZE, DATAOFF + cap + 1); //1?
     if (!store) {ERR("failed allocation"); return;}
     *store = (Store){
-        .owner = dst,
         .refcnt = 1,
         .data = {'\0'}
     };
@@ -251,7 +249,6 @@ bft_free (Buffet *buf)
         *buf = ZERO;
         -- store->refcnt;
         if (!store->refcnt) {
-            *store->owner = ZERO; // SCOPE ???? If owner was local then passed out ?
             free(store);
         }
 

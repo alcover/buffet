@@ -26,7 +26,7 @@ $(asm): $(lib)
 $(check): src/check.c $(lib)
 	@ echo $@
 	@ $(CP) $< $(lib) -o $@
-# 	@ ./$@
+	@ ./$@
 
 $(example): src/example.c $(lib)
 	@ echo $@
