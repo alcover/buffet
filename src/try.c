@@ -18,25 +18,10 @@ Buffet pass_owner(){
 
 int main() {
 
-	#define MUL 1.618033988749
-	size_t a=2;
-	for (int i = 0; i < 10; ++i)
-	{
-		a *= MUL;
-		LOGVI(a);
-	}
+	Buffet own = pass_owner();
+	Buffet ref = bft_view (&own, 10, 4); // "abcd"
+	bft_free(&own);
+	bft_free(&ref);
 
-// {
-// 	Buffet own;
-// 	bft_strcopy (&own, alpha, 40);
-// 	Buffet ref = bft_view (&own, 10, 4); // "abcd"
-// 	bft_free(&own);
-// 	bft_free(&ref);
-// }
-
-Buffet own = pass_owner();
-Buffet ref = bft_view (&own, 10, 4); // "abcd"
-bft_free(&own);
-bft_free(&ref);
-
-return 0;}
+	return 0;
+}
