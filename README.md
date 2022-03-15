@@ -38,9 +38,6 @@ union Buffet {
         char     data[15]
         uint8_t  len:6, type:2
     } sso
-
-    char fill[BFT_SIZE]
- 
 }
 ```  
 The `type` tag sets how a *Buffet* is interpreted :
@@ -205,11 +202,11 @@ bft_print(&ref); // Bon
 ```C
 void bft_free (Buffet *buf)
 ```
-If *buf* is not owning, it is zeroed, making it an empty SSO.  
-
+If *buf* is SSO or VUE, it is simply zeroed, making it an empty SSO.  
+If *buf* is REF, the refcount is decremented and *buf* zeroed.  
 If *buf* owns data :  
-- if there are no references to *buf*, the data is released and *buf* is zeroed
-- if there are references, *buf* is just marked for release  
+- with no references, the data is released and *buf* is zeroed
+- with live references, *buf* is marked for release and waits for its last ref to be released.  
 
 
 ```C
@@ -243,7 +240,6 @@ size_t bft_append (Buffet *dst, const char *src, size_t len)
 ```
 Appends `len` bytes from `src` to `dst`.  
 Returns new length or 0 on error.
-
 If over capacity, `dst` gets reallocated. 
 
 ```C
