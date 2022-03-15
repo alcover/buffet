@@ -21,7 +21,7 @@ typedef enum {
 
 typedef struct {
     uint64_t  refcnt; 
-    char    data[8];
+    char    data[1];
 } Store;
 
 #define OVERALLOC 1.6
@@ -51,24 +51,29 @@ getcap (const Buffet *buf, Tag tag) {
 }
 
 static Store*
-getownstore (Buffet *own) {
+getstore_own (Buffet *own) {
     return (Store*)(own->ptr.data - DATAOFF);
 }
 
 static Store*
-getrefstore (Buffet *ref) {
+getstore_ref (Buffet *ref) {
     ptrdiff_t off = REFOFF(ref); // for debug
     return (Store*)(ref->ptr.data - off - DATAOFF);
 }
 
-static void
+static char*
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 {
-    cap = cap+1; //?
-    if (cap % STEP) cap = (cap/STEP+1)*STEP; // round to next STEP
+    size_t fincap = cap;
+    // round to next STEP
+    if (fincap % STEP) fincap = (fincap/STEP+1)*STEP;
 
-    Store *store = aligned_alloc(BUFFET_SIZE, DATAOFF + cap + 1); //1?
-    if (!store) {ERR("failed allocation"); return;}
+    Store *store = aligned_alloc(BUFFET_SIZE, DATAOFF + fincap + 1);
+    if (!store) {
+        ERR("failed allocation"); 
+        return NULL;
+    }
+
     *store = (Store){
         .refcnt = 1,
         .data = {'\0'}
@@ -81,25 +86,24 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
     *dst = (Buffet) {
         .ptr.data = data,
         .ptr.len = len,
-        .ptr.aux = cap/STEP,
+        .ptr.aux = fincap/STEP,
         .ptr.tag = OWN
     };
+
+    return data;
 }
 
+// separate for future buffet_grow()
 static char*
 grow_sso (Buffet *buf, size_t newcap)
 {
-    Buffet dst;
-    new_own (&dst, newcap, buf->sso.data, buf->sso.len);
-    *buf = dst;
-
-    return buf->ptr.data; //?
+    return new_own (buf, newcap, buf->sso.data, buf->sso.len);
 }
 
 static char*
 grow_own (Buffet *buf, size_t newcap)
 {
-    Store *store = getownstore(buf);
+    Store *store = getstore_own(buf);
     
     store = realloc(store, DATAOFF + newcap + 1);
     if (!store) return NULL;
@@ -146,7 +150,7 @@ buffet_strcopy (Buffet *dst, const char* src, size_t len)
         memcpy(dst->sso.data, src, len);
         dst->sso.len = len;
     } else {
-        new_own(dst, len, src, len); //?
+        new_own(dst, len, src, len);
     }
 }
 
@@ -227,7 +231,7 @@ buffet_free (Buffet *buf)
     
     if (tag == OWN) {
         
-        Store *store = getownstore(buf);
+        Store *store = getstore_own(buf);
 
         if (!(store->refcnt-1)) {
             free(store);
@@ -238,7 +242,7 @@ buffet_free (Buffet *buf)
 
     } else { // REF
 
-        Store *store = getrefstore(buf);
+        Store *store = getstore_ref(buf);
 
         *buf = ZERO;
         if (!--store->refcnt) {
@@ -282,7 +286,7 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
 
     } else if (tag==REF) {
 
-        Store *store = getrefstore(buf);
+        Store *store = getstore_ref(buf);
         buffet_strcopy (buf, curdata, curlen); 
         -- store->refcnt;
         buffet_append (buf, src, srclen);
