@@ -6,18 +6,18 @@ int main()
 	char text[] = "The train is fast";
 	
 	Buffet vue;
-	bft_strview (&vue, text+4, 5);
-	bft_print(&vue);
+	buffet_strview (&vue, text+4, 5);
+	buffet_print(&vue);
 
 	text[4] = 'b';
-	bft_print(&vue);
+	buffet_print(&vue);
 
-	Buffet ref = bft_view (&vue, 1, 4);
-	bft_print(&ref);
+	Buffet ref = buffet_view (&vue, 1, 4);
+	buffet_print(&ref);
 
 	char wet[] = " is wet";
-	bft_append (&ref, wet, sizeof(wet));
-	bft_print(&ref);
+	buffet_append (&ref, wet, sizeof(wet));
+	buffet_print(&ref);
 
 	return 0;
 }

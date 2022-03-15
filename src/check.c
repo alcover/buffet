@@ -27,13 +27,13 @@ char tmp[100];
 static void 
 check_free (Buffet *b)
 {
-    bft_free(b);
+    buffet_free(b);
 
-    assert_int (bft_len(b), 0);
-    assert_int (bft_cap(b), BFT_SSO_CAP);
-    assert_str (bft_data(b), "");
+    assert_int (buffet_len(b), 0);
+    assert_int (buffet_cap(b), BUFFET_SSO);
+    assert_str (buffet_data(b), "");
     bool mustfree;
-    assert_str (bft_cstr(b,&mustfree), "");
+    assert_str (buffet_cstr(b,&mustfree), "");
     assert(!mustfree);
 }
 
@@ -48,7 +48,7 @@ static void
 check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
 {
     bool mustfree;
-    const char *cstr = bft_cstr(b, &mustfree);
+    const char *cstr = buffet_cstr(b, &mustfree);
     const char *expstr = take(off,len);
 
     assert_str (cstr, expstr);
@@ -60,7 +60,7 @@ check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
 static void 
 check_export (Buffet *b, size_t off, size_t len)
 {
-    char *export = bft_export(b);
+    char *export = buffet_export(b);
     const char *expstr = take(off,len);
     assert_str (export, expstr);
     free(export);
@@ -71,15 +71,15 @@ static void
 u_new (size_t cap) 
 {
     Buffet b; 
-    bft_new (&b, cap); 
+    buffet_new (&b, cap); 
 
-    assert (bft_cap(&b) >= cap);    
-    assert_int (bft_len(&b), 0);
-    assert_str (bft_data(&b), "");
+    assert (buffet_cap(&b) >= cap);    
+    assert_int (buffet_len(&b), 0);
+    assert_str (buffet_data(&b), "");
     check_cstr (&b, 0, 0, false);
     check_export (&b, 0, 0);
     
-    bft_free(&b); 
+    buffet_free(&b); 
 }
 
 #define u_new_around(n) \
@@ -92,8 +92,8 @@ static void new()
     u_new (0);
     u_new (1);
     u_new (8);
-    u_new_around (BFT_SSO_CAP);
-    u_new_around (BFT_SIZE);
+    u_new_around (BUFFET_SSO);
+    u_new_around (BUFFET_SIZE);
     u_new_around (32);
     u_new_around (64);
     u_new_around (1024);
@@ -106,14 +106,14 @@ static void
 u_strcopy (size_t off, size_t len)
 {
     Buffet b;
-    bft_strcopy (&b, alpha+off, len);
+    buffet_strcopy (&b, alpha+off, len);
 
-    assert_int (bft_len(&b), len);
-    assert_strn (bft_data(&b), alpha+off, len);
+    assert_int (buffet_len(&b), len);
+    assert_strn (buffet_data(&b), alpha+off, len);
     check_cstr (&b, off, len, false);
     check_export (&b, off, len);
     
-    bft_free(&b);
+    buffet_free(&b);
 }
 
 static void strcopy() 
@@ -121,18 +121,18 @@ static void strcopy()
     u_strcopy (0, 0); 
     u_strcopy (0, 1); 
     u_strcopy (0, 8);
-    u_strcopy (0, BFT_SSO_CAP-1);
-    u_strcopy (0, BFT_SSO_CAP);
-    u_strcopy (0, BFT_SSO_CAP+1);
+    u_strcopy (0, BUFFET_SSO-1);
+    u_strcopy (0, BUFFET_SSO);
+    u_strcopy (0, BUFFET_SSO+1);
     u_strcopy (0, 20);
     u_strcopy (0, 40);
 
     u_strcopy (8, 0); 
     u_strcopy (8, 1); 
     u_strcopy (8, 8);
-    u_strcopy (8, BFT_SSO_CAP-1);
-    u_strcopy (8, BFT_SSO_CAP);
-    u_strcopy (8, BFT_SSO_CAP+1);
+    u_strcopy (8, BUFFET_SSO-1);
+    u_strcopy (8, BUFFET_SSO);
+    u_strcopy (8, BUFFET_SSO+1);
     u_strcopy (8, 20);
     u_strcopy (8, 40);
 }
@@ -141,14 +141,14 @@ static void strcopy()
 static void u_strview (size_t off, size_t len)
 {
     Buffet b;
-    bft_strview (&b, alpha+off, len);
+    buffet_strview (&b, alpha+off, len);
 
-    assert_int (bft_len(&b), len);
-    assert_strn (bft_data(&b), alpha+off, len);
+    assert_int (buffet_len(&b), len);
+    assert_strn (buffet_data(&b), alpha+off, len);
     check_cstr (&b, off, len, true);
     check_export (&b, off, len);
     
-    bft_free(&b);
+    buffet_free(&b);
 }
 
 static void strview() 
@@ -156,18 +156,18 @@ static void strview()
     u_strview (0, 0); 
     u_strview (0, 1); 
     u_strview (0, 8);
-    u_strview (0, BFT_SSO_CAP-1);
-    u_strview (0, BFT_SSO_CAP);
-    u_strview (0, BFT_SSO_CAP+1);
+    u_strview (0, BUFFET_SSO-1);
+    u_strview (0, BUFFET_SSO);
+    u_strview (0, BUFFET_SSO+1);
     u_strview (0, 20);
     u_strview (0, 40);
 
     u_strview (8, 0); 
     u_strview (8, 1); 
     u_strview (8, 8);
-    u_strview (8, BFT_SSO_CAP-1);
-    u_strview (8, BFT_SSO_CAP);
-    u_strview (8, BFT_SSO_CAP+1);
+    u_strview (8, BUFFET_SSO-1);
+    u_strview (8, BUFFET_SSO);
+    u_strview (8, BUFFET_SSO+1);
     u_strview (8, 20);
     u_strview (8, 40);
 }
@@ -177,16 +177,16 @@ static void
 u_copy (size_t off, size_t len)
 {
     Buffet src;
-    bft_strcopy (&src, alpha, alphalen);
-    Buffet b = bft_copy(&src, off, len);
+    buffet_strcopy (&src, alpha, alphalen);
+    Buffet b = buffet_copy(&src, off, len);
 
-    assert_int (bft_len(&b), len);
-    assert_strn (bft_data(&b), alpha+off, len);
+    assert_int (buffet_len(&b), len);
+    assert_strn (buffet_data(&b), alpha+off, len);
     check_cstr (&b, off, len, false);
     check_export (&b, off, len);
     
-    bft_free(&b);
-    bft_free(&src);
+    buffet_free(&b);
+    buffet_free(&src);
 }
 
 static void copy()
@@ -194,18 +194,18 @@ static void copy()
     u_copy (0, 0); 
     u_copy (0, 1); 
     u_copy (0, 8);
-    u_copy (0, BFT_SSO_CAP-1);
-    u_copy (0, BFT_SSO_CAP);
-    u_copy (0, BFT_SSO_CAP+1);
+    u_copy (0, BUFFET_SSO-1);
+    u_copy (0, BUFFET_SSO);
+    u_copy (0, BUFFET_SSO+1);
     u_copy (0, 20);
     u_copy (0, 40);
 
     u_copy (8, 0); 
     u_copy (8, 1); 
     u_copy (8, 8);
-    u_copy (8, BFT_SSO_CAP-1);
-    u_copy (8, BFT_SSO_CAP);
-    u_copy (8, BFT_SSO_CAP+1);
+    u_copy (8, BUFFET_SSO-1);
+    u_copy (8, BUFFET_SSO);
+    u_copy (8, BUFFET_SSO+1);
     u_copy (8, 20);
     u_copy (8, 40);
     u_copy (0, alphalen);
@@ -217,50 +217,50 @@ static void
 u_view (size_t srclen, size_t off, size_t len)
 {
     Buffet src;
-    bft_strcopy (&src, alpha, srclen);
-    Buffet view = bft_view (&src, off, len);
+    buffet_strcopy (&src, alpha, srclen);
+    Buffet view = buffet_view (&src, off, len);
 
-    assert_int (bft_len(&view), len);
-    assert_strn (bft_data(&view), alpha+off, len);
+    assert_int (buffet_len(&view), len);
+    assert_strn (buffet_data(&view), alpha+off, len);
     check_cstr (&view, off, len, true);
     check_export (&view, off, len);
     
-    bft_free(&view);
-    bft_free(&src);
+    buffet_free(&view);
+    buffet_free(&src);
 }
 
 static void 
 u_view_ref (size_t off, size_t len)
 {
     Buffet b;
-    bft_strcopy (&b, alpha, alphalen);
-    Buffet src = bft_view (&b, 0, alphalen);
-    Buffet view = bft_view (&src, off, len);
+    buffet_strcopy (&b, alpha, alphalen);
+    Buffet src = buffet_view (&b, 0, alphalen);
+    Buffet view = buffet_view (&src, off, len);
 
-    assert_int (bft_len(&view), len);
-    assert_strn (bft_data(&view), alpha+off, len);
+    assert_int (buffet_len(&view), len);
+    assert_strn (buffet_data(&view), alpha+off, len);
     check_cstr (&view, off, len, true);
     check_export (&view, off, len); 
     
-    bft_free(&view);
-    bft_free(&src);
-    bft_free(&b);
+    buffet_free(&view);
+    buffet_free(&src);
+    buffet_free(&b);
 }
 
 static void 
 u_view_vue (size_t off, size_t len)
 {
     Buffet src;
-    bft_strview (&src, alpha, alphalen);
-    Buffet view = bft_view (&src, off, len);
+    buffet_strview (&src, alpha, alphalen);
+    Buffet view = buffet_view (&src, off, len);
 
-    assert_int (bft_len(&view), len);
-    assert_strn (bft_data(&view), alpha+off, len);
+    assert_int (buffet_len(&view), len);
+    assert_strn (buffet_data(&view), alpha+off, len);
     check_cstr (&view, off, len, true);
     check_export (&view, off, len);
 
-    bft_free(&view);
-    bft_free(&src);
+    buffet_free(&view);
+    buffet_free(&src);
 }
 
 // TODO fill-up refcnt
@@ -295,15 +295,15 @@ static void
 u_append_new (size_t cap, size_t len)
 {
     Buffet b;
-    bft_new (&b, cap);
-    bft_append (&b, alpha, len);
+    buffet_new (&b, cap);
+    buffet_append (&b, alpha, len);
 
-    assert_int (bft_len(&b), len);
-    assert_strn (bft_data(&b), alpha, len);
+    assert_int (buffet_len(&b), len);
+    assert_strn (buffet_data(&b), alpha, len);
     check_cstr (&b, 0, len, false);
     check_export (&b, 0, len);
 
-    bft_free(&b);    
+    buffet_free(&b);    
 }
 
 static void 
@@ -311,15 +311,15 @@ u_append_strcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
-    bft_strcopy (&b, alpha, initlen); 
-    bft_append (&b, alpha+initlen, len); 
+    buffet_strcopy (&b, alpha, initlen); 
+    buffet_append (&b, alpha+initlen, len); 
 
-    assert_int (bft_len(&b), totlen);
-    assert_strn (bft_data(&b), alpha, totlen);
+    assert_int (buffet_len(&b), totlen);
+    assert_strn (buffet_data(&b), alpha, totlen);
     check_cstr (&b, 0, totlen, false);
     check_export (&b, 0, totlen);
 
-    bft_free(&b);    
+    buffet_free(&b);    
 }
 
 static void 
@@ -327,15 +327,15 @@ u_append_strview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
-    bft_strview (&b, alpha, initlen);
-    bft_append (&b, alpha+initlen, len);
+    buffet_strview (&b, alpha, initlen);
+    buffet_append (&b, alpha+initlen, len);
 
-    assert_int (bft_len(&b), totlen);
-    assert_strn (bft_data(&b), alpha, totlen);
+    assert_int (buffet_len(&b), totlen);
+    assert_strn (buffet_data(&b), alpha, totlen);
     check_cstr (&b, 0, totlen, false);
     check_export (&b, 0, totlen);
     
-    bft_free(&b);    
+    buffet_free(&b);    
 }
 
 static void 
@@ -343,17 +343,17 @@ u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet src;
-    bft_strcopy (&src, alpha, initlen);
-    Buffet ref = bft_view (&src, 0, initlen);
-    bft_append (&ref, alpha+initlen, len);
+    buffet_strcopy (&src, alpha, initlen);
+    Buffet ref = buffet_view (&src, 0, initlen);
+    buffet_append (&ref, alpha+initlen, len);
 
-    assert_int (bft_len(&ref), totlen);
-    assert_strn (bft_data(&ref), alpha, totlen);
+    assert_int (buffet_len(&ref), totlen);
+    assert_strn (buffet_data(&ref), alpha, totlen);
     check_cstr (&ref, 0, totlen, false);
     check_export (&ref, 0, totlen);
     
-    bft_free(&ref); 
-    bft_free(&src);    
+    buffet_free(&ref); 
+    buffet_free(&src);    
 }
 
 static void append()
@@ -396,42 +396,42 @@ static void free_()
 {
     {
         Buffet b; 
-        bft_new (&b, 10); 
+        buffet_new (&b, 10); 
         check_free(&b);
     }
     {
         Buffet b; 
-        bft_strcopy (&b, alpha, 10); 
+        buffet_strcopy (&b, alpha, 10); 
         check_free(&b);
     }
     {
         Buffet b; 
-        bft_strcopy (&b, alpha, 40); 
+        buffet_strcopy (&b, alpha, 40); 
         check_free(&b);
     }
     {
         Buffet b; 
-        bft_strview (&b, alpha, 10); 
+        buffet_strview (&b, alpha, 10); 
         check_free(&b);
     }
     {
         Buffet own;
-        bft_strcopy (&own, alpha, 40);
-        Buffet ref = bft_view (&own, 10, 4); 
+        buffet_strcopy (&own, alpha, 40);
+        Buffet ref = buffet_view (&own, 10, 4); 
         check_free(&ref);
-        bft_free(&own);
+        buffet_free(&own);
     }
     {
         Buffet own;
-        bft_strcopy (&own, alpha, 40);
-        Buffet cpy = bft_copy (&own, 10, 4); 
+        buffet_strcopy (&own, alpha, 40);
+        Buffet cpy = buffet_copy (&own, 10, 4); 
         check_free(&cpy);
-        bft_free(&own);
+        buffet_free(&own);
     }
 
     {   // double free
         Buffet b; 
-        bft_strcopy (&b, alpha, 40); 
+        buffet_strcopy (&b, alpha, 40); 
         check_free(&b);
         check_free(&b);
     }

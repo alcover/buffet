@@ -10,7 +10,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include "buffet.h"
 #include "log.h"
 
-static_assert (sizeof(Buffet)==BFT_SIZE, "Buffet size");
+static_assert (sizeof(Buffet)==BUFFET_SIZE, "Buffet size");
 
 typedef enum {
     SSO = 0,
@@ -25,7 +25,7 @@ typedef struct {
 } Store;
 
 #define OVERALLOC 1.6
-#define STEP (1ull<<BFT_TYPE_BITS)
+#define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
 #define DATAOFF offsetof(Store,data)
 #define TYPE(buf) ((buf)->sso.type)
@@ -46,7 +46,7 @@ static size_t
 getcap (const Buffet *buf, Type type) {
     return 
         type == OWN ? (STEP * buf->ptr.aux)
-    :   type == SSO ? BFT_SSO_CAP
+    :   type == SSO ? BUFFET_SSO
     :   0;
 }
 
@@ -65,7 +65,7 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
     cap = cap+1; //?
     if (cap % STEP) cap = (cap/STEP+1)*STEP; // round to next STEP
 
-    Store *store = aligned_alloc(BFT_SIZE, DATAOFF + cap + 1); //1?
+    Store *store = aligned_alloc(BUFFET_SIZE, DATAOFF + cap + 1); //1?
     if (!store) {ERR("failed allocation"); return;}
     *store = (Store){
         .refcnt = 1,
@@ -125,22 +125,22 @@ print_type (Buffet *buf, char *out) {
 //=============================================================================
 
 void
-bft_new (Buffet *dst, size_t cap)
+buffet_new (Buffet *dst, size_t cap)
 {
     *dst = ZERO;
 
-    if (cap > BFT_SSO_CAP) {
+    if (cap > BUFFET_SSO) {
         new_own(dst, cap, NULL, 0);
     }
 }
 
 
 void
-bft_strcopy (Buffet *dst, const char* src, size_t len)
+buffet_strcopy (Buffet *dst, const char* src, size_t len)
 {
     *dst = ZERO;
     
-    if (len <= BFT_SSO_CAP) {
+    if (len <= BUFFET_SSO) {
         memcpy(dst->sso.data, src, len);
         dst->sso.len = len;
     } else {
@@ -150,7 +150,7 @@ bft_strcopy (Buffet *dst, const char* src, size_t len)
 
 
 void
-bft_strview (Buffet *dst, const char* src, size_t len)
+buffet_strview (Buffet *dst, const char* src, size_t len)
 {
     *dst = (Buffet) {
         .ptr.data = (char*)src,
@@ -161,10 +161,10 @@ bft_strview (Buffet *dst, const char* src, size_t len)
 
 
 Buffet
-bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
+buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 {
     Buffet ret;
-    bft_strcopy (&ret, getdata(src)+off, len);
+    buffet_strcopy (&ret, getdata(src)+off, len);
     return ret;
 }
 
@@ -185,7 +185,7 @@ view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len)
 
 
 Buffet
-bft_view (const Buffet *src, ptrdiff_t off, size_t len)
+buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 {
     const char *data = getdata(src); 
     Buffet ret;// = ZERO;
@@ -194,7 +194,7 @@ bft_view (const Buffet *src, ptrdiff_t off, size_t len)
         
         case SSO:
         case VUE: {
-            bft_strview (&ret, data + off, len); 
+            buffet_strview (&ret, data + off, len); 
         }   break;
         
         case OWN: {
@@ -213,7 +213,7 @@ bft_view (const Buffet *src, ptrdiff_t off, size_t len)
 
 
 void
-bft_free (Buffet *buf)
+buffet_free (Buffet *buf)
 {
     const Type type = TYPE(buf);
 
@@ -244,7 +244,7 @@ bft_free (Buffet *buf)
 
 
 size_t 
-bft_append (Buffet *buf, const char *src, size_t srclen) 
+buffet_append (Buffet *buf, const char *src, size_t srclen) 
 {
     const Type type = TYPE(buf);
     const size_t curlen = getlen(buf);
@@ -278,14 +278,14 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
     } else if (type==REF) {
 
         Store *store = getstore(buf, type);
-        bft_strcopy (buf, curdata, curlen); 
+        buffet_strcopy (buf, curdata, curlen); 
         -- store->refcnt;
-        bft_append (buf, src, srclen);
+        buffet_append (buf, src, srclen);
 
     } else {
 
-        bft_strcopy (buf, curdata, curlen); 
-        bft_append (buf, src, srclen);
+        buffet_strcopy (buf, curdata, curlen); 
+        buffet_append (buf, src, srclen);
     }
 
     return newlen;
@@ -294,7 +294,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
 
 // todo no allocation if ref/vue whole len or stops at end
 const char*
-bft_cstr (const Buffet *buf, bool *mustfree) 
+buffet_cstr (const Buffet *buf, bool *mustfree) 
 {
     const char *data = getdata(buf);
     *mustfree = false;
@@ -328,7 +328,7 @@ bft_cstr (const Buffet *buf, bool *mustfree)
 
 
 char*
-bft_export (const Buffet* buf) 
+buffet_export (const Buffet* buf) 
 {
     const size_t len = getlen(buf);
     const char* data = getdata(buf);
@@ -346,32 +346,30 @@ bft_export (const Buffet* buf)
 }
 
 const char*
-bft_data (const Buffet* buf) {
+buffet_data (const Buffet* buf) {
     return getdata(buf);
 }
 
 size_t
-bft_cap (const Buffet* buf) {
+buffet_cap (const Buffet* buf) {
     return getcap(buf, TYPE(buf));
 }
 
 size_t
-bft_len (const Buffet* buf) {
+buffet_len (const Buffet* buf) {
     return getlen(buf);
 }
 
 void
-bft_print (const Buffet *buf) {
+buffet_print (const Buffet *buf) {
     printf("%.*s\n", (int)getlen(buf), getdata(buf));
 }
 
 void 
-bft_dbg (Buffet* buf) 
+buffet_dbg (Buffet* buf) 
 {
     char type[5];
     print_type(buf, type);
-    printf ("type:%s cap:%zu len:%zu data:'%s' ", 
-        type, bft_cap(buf), bft_len(buf), bft_data(buf));
-    printf ("viewing:");
-    bft_print(buf);
+    printf ("type:%s cap:%zu len:%zu data:'%s'\n", 
+        type, buffet_cap(buf), buffet_len(buf), buffet_data(buf));
 }

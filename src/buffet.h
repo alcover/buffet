@@ -23,43 +23,43 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdint.h>
 #include <stdbool.h>
 
-#define BFT_SIZE 16
-#define BFT_SSO_CAP (BFT_SIZE-2)
-#define BFT_TYPE_BITS 2
+#define BUFFET_SIZE 16
+#define BUFFET_SSO (BUFFET_SIZE-2)
+#define BUFFET_TAG 2
 
 typedef union Buffet {
         
     struct {
         char*    data;
         uint32_t len;
-        uint32_t aux:32-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
+        uint32_t aux:32-BUFFET_TAG, type:BUFFET_TAG;
     } ptr;
 
     struct {
-        char     data[BFT_SIZE-1];
-        uint8_t  len:8-BFT_TYPE_BITS, type:BFT_TYPE_BITS;
+        char     data[BUFFET_SIZE-1];
+        uint8_t  len:8-BUFFET_TAG, type:BUFFET_TAG;
     } sso;
 
-    char fill[BFT_SIZE];
+    char fill[BUFFET_SIZE];
  
 } Buffet;
 
 
-void    bft_new (Buffet *dst, size_t cap);
-void    bft_strcopy (Buffet *dst, const char *src, size_t len);
-void    bft_strview (Buffet *dst, const char *src, size_t len);
-Buffet  bft_copy (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  bft_view (const Buffet *src, ptrdiff_t off, size_t len);
-size_t  bft_append (Buffet *dst, const char *src, size_t len);
-void    bft_free (Buffet *buf);
+void    buffet_new (Buffet *dst, size_t cap);
+void    buffet_strcopy (Buffet *dst, const char *src, size_t len);
+void    buffet_strview (Buffet *dst, const char *src, size_t len);
+Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
+Buffet  buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
+size_t  buffet_append (Buffet *dst, const char *src, size_t len);
+void    buffet_free (Buffet *buf);
 
-size_t  bft_cap (const Buffet *buf);
-size_t  bft_len (const Buffet *buf);
-const char* bft_data (const Buffet *buf);
-const char* bft_cstr (const Buffet *buf, bool *mustfree);
-char*   bft_export (const Buffet *buf);
+size_t  buffet_cap (const Buffet *buf);
+size_t  buffet_len (const Buffet *buf);
+const char* buffet_data (const Buffet *buf);
+const char* buffet_cstr (const Buffet *buf, bool *mustfree);
+char*   buffet_export (const Buffet *buf);
 
-void    bft_print (const Buffet *buf);
-void    bft_dbg (Buffet *buf);
+void    buffet_print (const Buffet *buf);
+void    buffet_dbg (Buffet *buf);
 
 #endif

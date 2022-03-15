@@ -21,7 +21,6 @@ In a mere register-fitting **16 bytes**.
 
 
 ## How
-Through a tagged union:  
 
 ```C
 union Buffet {
@@ -52,7 +51,7 @@ The `ptr` sub-type covers :
 - `VUE` : with `aux` as offset
 
 
-Any *owned* data (`SSO`/`OWN`) is null-terminated.  
+Any *proper* data (`SSO`/`OWN`) is null-terminated.  
 
 ![schema](assets/schema.png)
 
@@ -75,18 +74,18 @@ int main()
     char text[] = "The train is fast";
 
     Buffet vue;
-    bft_strview (&vue, text+4, 5);
-    bft_print(&vue);
+    buffet_strview (&vue, text+4, 5);
+    buffet_print(&vue);
 
     text[4] = 'b';
-    bft_print(&vue);
+    buffet_print(&vue);
 
-    Buffet ref = bft_view (&vue, 1, 4);
-    bft_print(&ref);
+    Buffet ref = buffet_view (&vue, 1, 4);
+    buffet_print(&ref);
 
     char wet[] = " is wet";
-    bft_append (&ref, wet, sizeof(wet));
-    bft_print(&ref);
+    buffet_append (&ref, wet, sizeof(wet));
+    buffet_print(&ref);
 
     return 0;
 }
@@ -105,54 +104,54 @@ rain is wet
 
 # API
 
-[bft_new](#bft_new)  
-[bft_strcopy](#bft_strcopy)  
-[bft_strview](#bft_strview)  
-[bft_copy](#bft_copy)  
-[bft_view](#bft_view)  
-[bft_append](#bft_append)  
-[bft_free](#bft_free)  
+[buffet_new](#buffet_new)  
+[buffet_strcopy](#buffet_strcopy)  
+[buffet_strview](#buffet_strview)  
+[buffet_copy](#buffet_copy)  
+[buffet_view](#buffet_view)  
+[buffet_append](#buffet_append)  
+[buffet_free](#buffet_free)  
 
-[bft_cap](#bft_cap)  
-[bft_len](#bft_len)  
-[bft_data](#bft_data)  
-[bft_cstr](#bft_cstr)  
-[bft_export](#bft_export)  
+[buffet_cap](#buffet_cap)  
+[buffet_len](#buffet_len)  
+[buffet_data](#buffet_data)  
+[buffet_cstr](#buffet_cstr)  
+[buffet_export](#buffet_export)  
 
-[bft_print](#bft_print)  
-[bft_dbg](#bft_dbg)  
+[buffet_print](#buffet_print)  
+[buffet_dbg](#buffet_dbg)  
 
 
-### bft_new
+### buffet_new
 ```C
-void bft_new (Buffet *dst, size_t cap)
+void buffet_new (Buffet *dst, size_t cap)
 ```
 Create a *Buffet* of capacity at least `cap`.  
 
 ```C
 Buffet buf;
-bft_new(&buf, 20);
-bft_dbg(&buf); 
+buffet_new(&buf, 20);
+buffet_dbg(&buf); 
 // type:OWN cap:32 len:0 data:''
 ```
 
-### bft_strcopy
+### buffet_strcopy
 ```C
-void bft_strcopy (Buffet *dst, const char *src, size_t len)
+void buffet_strcopy (Buffet *dst, const char *src, size_t len)
 ```
 Copy `len` bytes from `src` into new `dst`.  
 
 ```C
 Buffet copy;
-bft_strcopy(&copy, "Bonjour", 3);
-bft_dbg(&copy); 
+buffet_strcopy(&copy, "Bonjour", 3);
+buffet_dbg(&copy); 
 // type:SSO cap:14 len:3 data:'Bon'
 
 ```
 
-### bft_strview
+### buffet_strview
 ```C
-void bft_strview (Buffet *dst, const char *src, size_t len)
+void buffet_strview (Buffet *dst, const char *src, size_t len)
 ```
 View `len` bytes from `src` into new `dst`.  
 You get a window into `src`. No copy or allocation is done.
@@ -160,24 +159,24 @@ You get a window into `src`. No copy or allocation is done.
 ```C
 char src[] = "Eat Buffet!";
 Buffet view;
-bft_strview(&view, src+4, 3);
-bft_dbg(&view);
+buffet_strview(&view, src+4, 3);
+buffet_dbg(&view);
 // type:VUE cap:0 len:6 data:'Buffet!'
-bft_print(&view);
+buffet_print(&view);
 // Buf
 ```
 
-### bft_copy
+### buffet_copy
 ```C
-Buffet bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
+Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
 Create new *Buffet* by copying `len` bytes from [data(`src`) + `off`].  
 The return is an independant owning Buffet.
 
 
-### bft_view
+### buffet_view
 ```C
-Buffet bft_view (const Buffet *src, ptrdiff_t off, size_t len)
+Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
 Create new *Buffet* by viewing `len` bytes from [data(`src`) + `off`].  
 The return is internally either 
@@ -191,16 +190,16 @@ The return is internally either
 
 ```C
 Buffet src;
-bft_strcopy(&src, "Bonjour", 7);
-Buffet ref = bft_view(&src, 0, 3);
-bft_dbg(&ref);   // type:VUE cap:0 len:6 data:'Buffet!'
-bft_print(&ref); // Bon
+buffet_strcopy(&src, "Bonjour", 7);
+Buffet ref = buffet_view(&src, 0, 3);
+buffet_dbg(&ref);   // type:VUE cap:0 len:3 data:'Bonjour'
+buffet_print(&ref); // Bon
 ```
 
 
-### bft_free
+### buffet_free
 ```C
-void bft_free (Buffet *buf)
+void buffet_free (Buffet *buf)
 ```
 If *buf* is SSO or VUE, it is simply zeroed, making it an empty SSO.  
 If *buf* is REF, the refcount is decremented and *buf* zeroed.  
@@ -213,30 +212,30 @@ If *buf* owns data :
 char text[] = "Le grand orchestre de Patato Valdez";
 
 Buffet own;
-bft_strcopy(&own, text, sizeof(text));
-bft_dbg(&own);
+buffet_strcopy(&own, text, sizeof(text));
+buffet_dbg(&own);
 // type:OWN data:'Le grand orchestre de Patato Valdez'
 
-Buffet ref = bft_view(&own, 22, 13);
-bft_dbg(&ref);
+Buffet ref = buffet_view(&own, 22, 13);
+buffet_dbg(&ref);
 // type:REF data:'Patato Valdez'
 
 // Too soon but marked for release
-bft_free(&own);
-bft_dbg(&own);
+buffet_free(&own);
+buffet_dbg(&own);
 // type:OWN data:'Le grand orchestre de Patato Valdez'
 
 // Release last ref, hence owner
-bft_free(&ref);
-bft_dbg(&own);
+buffet_free(&ref);
+buffet_dbg(&own);
 // type:SSO data:''
 ```
 
 
 
-### bft_append
+### buffet_append
 ```C
-size_t bft_append (Buffet *dst, const char *src, size_t len)
+size_t buffet_append (Buffet *dst, const char *src, size_t len)
 ```
 Appends `len` bytes from `src` to `dst`.  
 Returns new length or 0 on error.
@@ -244,64 +243,64 @@ If over capacity, `dst` gets reallocated.
 
 ```C
 Buffet buf;
-bft_strcopy(&buf, "abc", 3); 
-size_t newlen = bft_append(&buf, "def", 3); // newlen == 6 
-bft_dbg(&buf);
+buffet_strcopy(&buf, "abc", 3); 
+size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
+buffet_dbg(&buf);
 // type:SSO cap:14 len:6 data:'abcdef'
 ```
 
 
 
 
-### bft_cap  
+### buffet_cap  
 Get current capacity.  
 ```C
-size_t bft_cap (Buffet *buf)
+size_t buffet_cap (Buffet *buf)
 ```
 
-### bft_len  
+### buffet_len  
 Get current length.  
 ```C
-size_t bft_len (Buffet *buf)`
+size_t buffet_len (Buffet *buf)`
 ```
 
-### bft_data
+### buffet_data
 Get current data pointer.  
 ```C
-const char* bft_data (const Buffet *buf)`
+const char* buffet_data (const Buffet *buf)`
 ```
-If *buf* is a ref/view, `strlen(bft_data)` may be longer than `buf.len`. 
+If *buf* is a ref/view, `strlen(buffet_data)` may be longer than `buf.len`. 
 
-### bft_cstr
+### buffet_cstr
 Get current data as a NUL-terminated **C string**.  
 ```C
-const char* bft_cstr (const Buffet *buf, bool *mustfree)
+const char* buffet_cstr (const Buffet *buf, bool *mustfree)
 ```
 If REF/VUE, the slice is copied into a fresh C string that must be freed.
 
-### bft_export
+### buffet_export
  Copies data up to `buf.len` into a fresh C string that must be freed.
 ```C
-char* bft_export (const Buffet *buf)
+char* buffet_export (const Buffet *buf)
 ```
 
 
 
-### bft_print
+### buffet_print
 Prints data up to `buf.len`.
 ```C
-void bft_print (const Buffet *buf)`
+void buffet_print (const Buffet *buf)`
 ```
 
-### bft_dbg  
+### buffet_dbg  
 Prints *buf* state.  
 ```C
-void bft_dbg (Buffet *buf)
+void buffet_dbg (Buffet *buf)
 ```
 
 ```C
 Buffet buf;
-bft_strcopy(&buf, "foo", 3);
-bft_dbg(&buf);
+buffet_strcopy(&buf, "foo", 3);
+buffet_dbg(&buf);
 // type:SSO cap:14 len:3 data:'foo'
 ```
