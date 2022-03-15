@@ -18,8 +18,6 @@
 
 In a mere register-fitting **16 bytes**.
 
-
-
 ## How
 
 ```C
@@ -40,18 +38,17 @@ union Buffet {
 }
 ```  
 The tag sets how a *Buffet* is interpreted :
-- `SSO` : as a char array
-- `OWN` : as owning heap-allocated data
-- `REF` : as a slice of owned data
-- `VUE` : as a slice of other data 
+- *SSO* : as a char array
+- *OWN* : as owning heap-allocated data
+- *REF* : as a slice of owned data
+- *VUE* : as a slice of other data 
 
 The `ptr` sub-type covers :
-- `OWN` : with `aux` as capacity
-- `REF` : with `aux` as offset
-- `VUE` : with `aux` as offset
+- *OWN* : with `aux` as capacity
+- *REF* : with `aux` as offset
+- *VUE* : with `aux` as offset
 
-
-Any *proper* data (`SSO`/`OWN`) is null-terminated.  
+Any *proper* data (*SSO*/*OWN*) is null-terminated.  
 
 ![schema](assets/schema.png)
 
@@ -100,8 +97,6 @@ rain is wet
 ```
 
 
-
-
 # API
 
 [buffet_new](#buffet_new)  
@@ -121,7 +116,6 @@ rain is wet
 [buffet_print](#buffet_print)  
 [buffet_dbg](#buffet_dbg)  
 
-
 ### buffet_new
 ```C
 void buffet_new (Buffet *dst, size_t cap)
@@ -139,7 +133,7 @@ buffet_dbg(&buf);
 ```C
 void buffet_strcopy (Buffet *dst, const char *src, size_t len)
 ```
-Copy `len` bytes from `src` into new `dst`.  
+Copy `len` bytes from string `src` into new Buffet `dst`.  
 
 ```C
 Buffet copy;
@@ -153,7 +147,7 @@ buffet_dbg(&copy);
 ```C
 void buffet_strview (Buffet *dst, const char *src, size_t len)
 ```
-View `len` bytes from `src` into new `dst`.  
+View `len` bytes from string `src` into new Buffet `dst`.  
 You get a window into `src`. No copy or allocation is done.
 
 ```C
@@ -170,19 +164,18 @@ buffet_print(&view);
 ```C
 Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new *Buffet* by copying `len` bytes from [data(`src`) + `off`].  
-The return is an independant owning Buffet.
+Create a new *Buffet* by copying `len` bytes from Buffet `src`, starting at offset `off`.  
 
 
 ### buffet_view
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new *Buffet* by viewing `len` bytes from [data(`src`) + `off`].  
+Create a new *Buffet* by viewing `len` bytes Buffet `src`, starting at offset `off`.  
 The return is internally either 
-- a reference to `src` if `src` is owning
-- a reference to `src`'s origin if `src` is itself a REF
-- a view on `src` data if `src` is SSO or VUE
+- a *REF* if `src` is owning
+- a *REF* to the origin if `src` is itself a *REF*
+- a *VUE* on `src` data if `src` is *SSO* or *VUE*
 
 `src` now cannot be released before either  
 - the return is released
@@ -201,9 +194,9 @@ buffet_print(&ref); // Bon
 ```C
 void buffet_free (Buffet *buf)
 ```
-If *buf* is SSO or VUE, it is simply zeroed, making it an empty SSO.  
-If *buf* is REF, the refcount is decremented and *buf* zeroed.  
-If *buf* owns data :  
+If `buf` is *SSO* or *VUE*, it is simply zeroed, making it an empty *SSO*.  
+If `buf` is *REF*, the refcount is decremented and *buf* zeroed.  
+If `buf` owns data :  
 - with no references, the data is released and *buf* is zeroed
 - with live references, *buf* is marked for release and waits for its last ref to be released.  
 
@@ -276,7 +269,7 @@ Get current data as a NUL-terminated **C string**.
 ```C
 const char* buffet_cstr (const Buffet *buf, bool *mustfree)
 ```
-If REF/VUE, the slice is copied into a fresh C string that must be freed.
+If *REF*/*VUE*, the slice is copied into a fresh C string that must be freed.
 
 ### buffet_export
  Copies data up to `buf.len` into a fresh C string that must be freed.
