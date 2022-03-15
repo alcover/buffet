@@ -1,7 +1,7 @@
 # Buffet
 
 *All-inclusive Buffer for C*  
-(Unit-tested but not yet stable, optimized or feature-complete)  
+(Experiment - not yet stable or optimized)  
 
 :orange_book: [API](#API)  
 
@@ -9,13 +9,14 @@
 
 ![schema](assets/buffet.png)  
 
-*Buffet* is a versatile string buffer type featuring
-- automated storage and reallocation  
-- **SSO** (Small String Optimization) : short data is stored inline
+*Buffet* is a polymorphic string buffer type featuring :
+- **SSO** (small string optimization) : short data is stored inline
 - **views** : no-cost references to slices of data  
-- **ref count** : accounting of reference-owner relation
+- **reference counting** : secures the release of views and owned data
+- **cstr** : obtain a null-terminated C string
+- automated (re)allocations  
 
-In only **16 bytes**, fitting a 128-bit register.
+In a mere register-fitting **16 bytes**.
 
 
 
@@ -23,36 +24,38 @@ In only **16 bytes**, fitting a 128-bit register.
 Through a tagged union:  
 
 ```C
-typedef union Buffet {
-      
+union Buffet {
+        
+    // OWN, REF, VUE
+    struct {
+        char*    data
+        uint32_t len
+        uint32_t aux:30, type:2 // aux = {cap|off}
+    } ptr
+
     // SSO
     struct {
-        char        sso[15]  // in-situ data
-        uint8_t     ssolen:4 // in-situ length
-    }
+        char     data[15]
+        uint8_t  len:6, type:2
+    } sso
 
-    // OWN | REF | VUE
-    struct { 
-        uint32_t len // data length
-        union {
-              uint32_t off // REF: data offset; VUE: address remainder
-              struct {
-                    uint16_t refcnt // OWN: number of references
-                    uint8_t  cap    // OWN: log2(allocated mem)
-              }
-        }
-        intptr_t data : 62 // OWN|VUE: data ptr; REF: ptr to owner
-        uint8_t  type : 2  // tag = {SSO|OWN|REF|VUE}
-    }
+    char fill[BFT_SIZE]
+ 
 }
 ```  
-Depending on its tag, a *Buffet* is interpreted as either
-- `SSO` : a char array as value
-- `OWN` : owning heap-allocated data
-- `REF` : referencing a slice of a data-owning *Buffet*
-- `VUE` : viewing data directly
+The `type` tag sets how a *Buffet* is interpreted :
+- `SSO` : as a char array
+- `OWN` : as owning heap-allocated data
+- `REF` : as a slice of owned data
+- `VUE` : as a slice of other data 
 
-Any *owned* data (SSO/OWN) is NUL-terminated.  
+The `ptr` sub-type covers :
+- `OWN` : with `aux` as capacity
+- `REF` : with `aux` as offset
+- `VUE` : with `aux` as offset
+
+
+Any *owned* data (`SSO`/`OWN`) is null-terminated.  
 
 ![schema](assets/schema.png)
 
@@ -110,14 +113,12 @@ rain is wet
 [bft_strview](#bft_strview)  
 [bft_copy](#bft_copy)  
 [bft_view](#bft_view)  
-[bft_free](#bft_free)  
-
 [bft_append](#bft_append)  
+[bft_free](#bft_free)  
 
 [bft_cap](#bft_cap)  
 [bft_len](#bft_len)  
 [bft_data](#bft_data)  
-
 [bft_cstr](#bft_cstr)  
 [bft_export](#bft_export)  
 
@@ -179,7 +180,7 @@ The return is an independant owning Buffet.
 
 ### bft_view
 ```C
-Buffet bft_view (Buffet *src, ptrdiff_t off, size_t len)
+Buffet bft_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
 Create new *Buffet* by viewing `len` bytes from [data(`src`) + `off`].  
 The return is internally either 
