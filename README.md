@@ -9,7 +9,7 @@
 
 ![schema](assets/buffet.png)  
 
-*Buffet* is a polymorphic string buffer Type featuring :
+*Buffet* is a polymorphic string buffer type featuring :
 - **SSO** (small string optimization) : short data is stored inline
 - **views** : no-cost references to slices of data  
 - **reference counting** : secures the release of views and owned data
@@ -45,7 +45,7 @@ The tag sets how a *Buffet* is interpreted :
 - `REF` : as a slice of owned data
 - `VUE` : as a slice of other data 
 
-The `ptr` sub-Type covers :
+The `ptr` sub-type covers :
 - `OWN` : with `aux` as capacity
 - `REF` : with `aux` as offset
 - `VUE` : with `aux` as offset
