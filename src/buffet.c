@@ -51,13 +51,15 @@ getcap (const Buffet *buf, Tag tag) {
 }
 
 static Store*
-getstore (Buffet *buf, Tag tag) 
-{
-    const char *data = getdata(buf);
-    if (tag==REF) data -= REFOFF(buf);
-    return (Store*)(data-DATAOFF);
+getownstore (Buffet *own) {
+    return (Store*)(own->ptr.data - DATAOFF);
 }
 
+static Store*
+getrefstore (Buffet *ref) {
+    ptrdiff_t off = REFOFF(ref); // for debug
+    return (Store*)(ref->ptr.data - off - DATAOFF);
+}
 
 static void
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
@@ -97,7 +99,7 @@ grow_sso (Buffet *buf, size_t newcap)
 static char*
 grow_own (Buffet *buf, size_t newcap)
 {
-    Store *store = getstore(buf, OWN);
+    Store *store = getownstore(buf);
     
     store = realloc(store, DATAOFF + newcap + 1);
     if (!store) return NULL;
@@ -222,9 +224,10 @@ buffet_free (Buffet *buf)
         return;
     }
         
-    Store *store = getstore(buf, tag);
     
     if (tag == OWN) {
+        
+        Store *store = getownstore(buf);
 
         if (!(store->refcnt-1)) {
             free(store);
@@ -234,6 +237,8 @@ buffet_free (Buffet *buf)
         }
 
     } else { // REF
+
+        Store *store = getrefstore(buf);
 
         *buf = ZERO;
         if (!--store->refcnt) {
@@ -277,7 +282,7 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
 
     } else if (tag==REF) {
 
-        Store *store = getstore(buf, tag);
+        Store *store = getrefstore(buf);
         buffet_strcopy (buf, curdata, curlen); 
         -- store->refcnt;
         buffet_append (buf, src, srclen);
