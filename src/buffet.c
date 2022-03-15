@@ -17,7 +17,7 @@ typedef enum {
     OWN,
     REF,
     VUE
-} Type;
+} Tag;
 
 typedef struct {
     uint64_t  refcnt; 
@@ -28,7 +28,7 @@ typedef struct {
 #define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
 #define DATAOFF offsetof(Store,data)
-#define TYPE(buf) ((buf)->sso.type)
+#define TYPE(buf) ((buf)->sso.tag)
 #define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
 #define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
 
@@ -43,18 +43,18 @@ getlen (const Buffet *buf) {
 }
 
 static size_t
-getcap (const Buffet *buf, Type type) {
+getcap (const Buffet *buf, Tag tag) {
     return 
-        type == OWN ? (STEP * buf->ptr.aux)
-    :   type == SSO ? BUFFET_SSO
+        tag == OWN ? (STEP * buf->ptr.aux)
+    :   tag == SSO ? BUFFET_SSO
     :   0;
 }
 
 static Store*
-getstore (Buffet *buf, Type type) 
+getstore (Buffet *buf, Tag tag) 
 {
     const char *data = getdata(buf);
-    if (type==REF) data -= REFOFF(buf);
+    if (tag==REF) data -= REFOFF(buf);
     return (Store*)(data-DATAOFF);
 }
 
@@ -80,7 +80,7 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
         .ptr.data = data,
         .ptr.len = len,
         .ptr.aux = cap/STEP,
-        .ptr.type = OWN
+        .ptr.tag = OWN
     };
 }
 
@@ -155,7 +155,7 @@ buffet_strview (Buffet *dst, const char* src, size_t len)
     *dst = (Buffet) {
         .ptr.data = (char*)src,
         .ptr.len = len,
-        .ptr.type = VUE
+        .ptr.tag = VUE
     };
 }
 
@@ -176,7 +176,7 @@ view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len)
         .ptr.data = (char*)(ownerdata + off),
         .ptr.len = len,
         .ptr.aux = off/STEP,
-        .ptr.type = REF     
+        .ptr.tag = REF     
     };
 
     Store *store = (Store*)(ownerdata-DATAOFF);
@@ -215,16 +215,16 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 void
 buffet_free (Buffet *buf)
 {
-    const Type type = TYPE(buf);
+    const Tag tag = TYPE(buf);
 
-    if (type == SSO || type == VUE) {
+    if (tag == SSO || tag == VUE) {
         *buf = ZERO;
         return;
     }
         
-    Store *store = getstore(buf, type);
+    Store *store = getstore(buf, tag);
     
-    if (type == OWN) {
+    if (tag == OWN) {
 
         if (!(store->refcnt-1)) {
             free(store);
@@ -246,14 +246,14 @@ buffet_free (Buffet *buf)
 size_t 
 buffet_append (Buffet *buf, const char *src, size_t srclen) 
 {
-    const Type type = TYPE(buf);
+    const Tag tag = TYPE(buf);
     const size_t curlen = getlen(buf);
-    const size_t curcap = getcap(buf, type);
+    const size_t curcap = getcap(buf, tag);
     const char *curdata = getdata(buf);
     size_t newlen = curlen + srclen;
     size_t newcap = OVERALLOC*newlen;
 
-    if (type==SSO) {
+    if (tag==SSO) {
 
         if (newlen <= curcap) {
             memcpy (buf->sso.data+curlen, src, srclen);
@@ -267,7 +267,7 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
             buf->ptr.len = newlen;
         }
 
-    } else if (type==OWN) {
+    } else if (tag==OWN) {
 
         char *data = (newlen <= curcap) ? buf->ptr.data : grow_own(buf, newcap);
         if (!data) {return 0;}
@@ -275,9 +275,9 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
         data[newlen] = 0;
         buf->ptr.len = newlen;
 
-    } else if (type==REF) {
+    } else if (tag==REF) {
 
-        Store *store = getstore(buf, type);
+        Store *store = getstore(buf, tag);
         buffet_strcopy (buf, curdata, curlen); 
         -- store->refcnt;
         buffet_append (buf, src, srclen);
@@ -368,8 +368,8 @@ buffet_print (const Buffet *buf) {
 void 
 buffet_dbg (Buffet* buf) 
 {
-    char type[5];
-    print_type(buf, type);
-    printf ("type:%s cap:%zu len:%zu data:'%s'\n", 
-        type, buffet_cap(buf), buffet_len(buf), buffet_data(buf));
+    char tag[5];
+    print_type(buf, tag);
+    printf ("tag:%s cap:%zu len:%zu data:'%s'\n", 
+        tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf));
 }

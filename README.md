@@ -9,7 +9,7 @@
 
 ![schema](assets/buffet.png)  
 
-*Buffet* is a polymorphic string buffer type featuring :
+*Buffet* is a polymorphic string buffer Type featuring :
 - **SSO** (small string optimization) : short data is stored inline
 - **views** : no-cost references to slices of data  
 - **reference counting** : secures the release of views and owned data
@@ -29,23 +29,23 @@ union Buffet {
     struct {
         char*    data
         uint32_t len
-        uint32_t aux:30, type:2 // aux = {cap|off}
+        uint32_t aux:30, tag:2 // aux = {cap|off}
     } ptr
 
     // SSO
     struct {
         char     data[15]
-        uint8_t  len:6, type:2
+        uint8_t  len:6, tag:2
     } sso
 }
 ```  
-The `type` tag sets how a *Buffet* is interpreted :
+The tag sets how a *Buffet* is interpreted :
 - `SSO` : as a char array
 - `OWN` : as owning heap-allocated data
 - `REF` : as a slice of owned data
 - `VUE` : as a slice of other data 
 
-The `ptr` sub-type covers :
+The `ptr` sub-Type covers :
 - `OWN` : with `aux` as capacity
 - `REF` : with `aux` as offset
 - `VUE` : with `aux` as offset
@@ -132,7 +132,7 @@ Create a *Buffet* of capacity at least `cap`.
 Buffet buf;
 buffet_new(&buf, 20);
 buffet_dbg(&buf); 
-// type:OWN cap:32 len:0 data:''
+// tag:OWN cap:32 len:0 data:''
 ```
 
 ### buffet_strcopy
@@ -145,7 +145,7 @@ Copy `len` bytes from `src` into new `dst`.
 Buffet copy;
 buffet_strcopy(&copy, "Bonjour", 3);
 buffet_dbg(&copy); 
-// type:SSO cap:14 len:3 data:'Bon'
+// tag:SSO cap:14 len:3 data:'Bon'
 
 ```
 
@@ -161,7 +161,7 @@ char src[] = "Eat Buffet!";
 Buffet view;
 buffet_strview(&view, src+4, 3);
 buffet_dbg(&view);
-// type:VUE cap:0 len:6 data:'Buffet!'
+// tag:VUE cap:0 len:6 data:'Buffet!'
 buffet_print(&view);
 // Buf
 ```
@@ -192,7 +192,7 @@ The return is internally either
 Buffet src;
 buffet_strcopy(&src, "Bonjour", 7);
 Buffet ref = buffet_view(&src, 0, 3);
-buffet_dbg(&ref);   // type:VUE cap:0 len:3 data:'Bonjour'
+buffet_dbg(&ref);   // tag:VUE cap:0 len:3 data:'Bonjour'
 buffet_print(&ref); // Bon
 ```
 
@@ -214,21 +214,21 @@ char text[] = "Le grand orchestre de Patato Valdez";
 Buffet own;
 buffet_strcopy(&own, text, sizeof(text));
 buffet_dbg(&own);
-// type:OWN data:'Le grand orchestre de Patato Valdez'
+// tag:OWN data:'Le grand orchestre de Patato Valdez'
 
 Buffet ref = buffet_view(&own, 22, 13);
 buffet_dbg(&ref);
-// type:REF data:'Patato Valdez'
+// tag:REF data:'Patato Valdez'
 
 // Too soon but marked for release
 buffet_free(&own);
 buffet_dbg(&own);
-// type:OWN data:'Le grand orchestre de Patato Valdez'
+// tag:OWN data:'Le grand orchestre de Patato Valdez'
 
 // Release last ref, hence owner
 buffet_free(&ref);
 buffet_dbg(&own);
-// type:SSO data:''
+// tag:SSO data:''
 ```
 
 
@@ -246,7 +246,7 @@ Buffet buf;
 buffet_strcopy(&buf, "abc", 3); 
 size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
 buffet_dbg(&buf);
-// type:SSO cap:14 len:6 data:'abcdef'
+// tag:SSO cap:14 len:6 data:'abcdef'
 ```
 
 
@@ -302,5 +302,5 @@ void buffet_dbg (Buffet *buf)
 Buffet buf;
 buffet_strcopy(&buf, "foo", 3);
 buffet_dbg(&buf);
-// type:SSO cap:14 len:3 data:'foo'
+// tag:SSO cap:14 len:3 data:'foo'
 ```
