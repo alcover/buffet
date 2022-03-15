@@ -20,14 +20,25 @@ typedef enum {
 } Tag;
 
 typedef struct {
-    uint64_t  refcnt; 
-    char    data[1];
+    uint32_t refcnt;
+    uint32_t canary;
+    char     data[1];
 } Store;
+
+
+// The store canary could prevent some memory faults
+// (If not optimized-out..)
+// For ex aliasing (buf1=buf2) :
+//   Buf owner = new_owning()
+//   Buf alias = owner // DANGER ZONE!
+//   buf_free(owner)   // checks canary : OK. Free store, erase canary.
+//   buf_free(alias) // (normally fatal) checks canary : NOPE 
+#define CANARY 1319548659
 
 #define OVERALLOC 1.6
 #define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
-#define DATAOFF offsetof(Store,data)
+#define STORE_DATAOFF offsetof(Store,data)
 #define TYPE(buf) ((buf)->sso.tag)
 #define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP);
 #define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
@@ -50,16 +61,40 @@ getcap (const Buffet *buf, Tag tag) {
     :   0;
 }
 
+// todo: dev-defensive
 static Store*
 getstore_own (Buffet *own) {
-    return (Store*)(own->ptr.data - DATAOFF);
+    return (Store*)(own->ptr.data - STORE_DATAOFF);
 }
 
 static Store*
 getstore_ref (Buffet *ref) {
     ptrdiff_t off = REFOFF(ref); // for debug
-    return (Store*)(ref->ptr.data - off - DATAOFF);
+    return (Store*)(ref->ptr.data - off - STORE_DATAOFF);
 }
+
+
+static Store*
+new_store (size_t cap)
+{
+    size_t mem = STORE_DATAOFF+cap+1;
+    Store *store = aligned_alloc (sizeof(Store), mem);
+
+    if (!store) {
+        ERR("failed Store allocation"); 
+        return NULL;
+    }
+    *store = (Store){
+        .refcnt = 0,
+        .canary = CANARY,
+        .data = {'\0'}
+    };
+
+    store->data[cap] = '\0'; // sec
+
+    return store;
+}
+
 
 static char*
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
@@ -68,16 +103,8 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
     // round to next STEP
     if (fincap % STEP) fincap = (fincap/STEP+1)*STEP;
 
-    Store *store = aligned_alloc(BUFFET_SIZE, DATAOFF + fincap + 1);
-    if (!store) {
-        ERR("failed allocation"); 
-        return NULL;
-    }
-
-    *store = (Store){
-        .refcnt = 1,
-        .data = {'\0'}
-    };
+    Store *store = new_store(fincap);
+    if (!store) return NULL;
 
     char *data = store->data;
     if (src) memcpy(data, src, len);
@@ -89,6 +116,8 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
         .ptr.aux = fincap/STEP,
         .ptr.tag = OWN
     };
+
+    store->refcnt = 1;
 
     return data;
 }
@@ -105,7 +134,7 @@ grow_own (Buffet *buf, size_t newcap)
 {
     Store *store = getstore_own(buf);
     
-    store = realloc(store, DATAOFF + newcap + 1);
+    store = realloc(store, STORE_DATAOFF + newcap + 1);
     if (!store) return NULL;
 
     char *newdata = store->data;
@@ -185,7 +214,7 @@ view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len)
         .ptr.tag = REF     
     };
 
-    Store *store = (Store*)(ownerdata-DATAOFF);
+    Store *store = (Store*)(ownerdata-STORE_DATAOFF);
     ++ store->refcnt;
 }
 
@@ -228,12 +257,18 @@ buffet_free (Buffet *buf)
         return;
     }
         
-    
     if (tag == OWN) {
         
         Store *store = getstore_own(buf);
 
+        if (store->canary != CANARY) {
+            ERR ("store canary not found");
+            *buf = ZERO;
+            return;
+        }
+
         if (!(store->refcnt-1)) {
+            store->canary = 0;
             free(store);
             *buf = ZERO;
         } else {
@@ -243,9 +278,15 @@ buffet_free (Buffet *buf)
     } else { // REF
 
         Store *store = getstore_ref(buf);
+        *buf = ZERO; //anyway
 
-        *buf = ZERO;
+        if (store->canary != CANARY) {
+            ERR ("store canary not found");
+            return;
+        }
+
         if (!--store->refcnt) {
+            store->canary = 0;
             free(store);
         }
     }
