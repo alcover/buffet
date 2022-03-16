@@ -2,7 +2,7 @@
 #define LOG_H
 
 	#define LOG(s) do{ printf("%s\n", s); fflush(stdout);} while(0)
-	#define ERR(args...) fprintf(stderr,args)
+	#define ERR(args...) do{fprintf(stderr,args); printf("\n");} while(0);
 
 	#define LOGS(s,msg) do{ printf("%s : '%s'\n", msg, s); 		fflush(stdout); } while(0)
 	#define LOGI(i,msg) do{ printf("%s : %d\n", msg, (int)(i)); 	fflush(stdout); } while(0)
