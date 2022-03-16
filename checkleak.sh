@@ -1,4 +1,7 @@
 #!/usr/bin/env sh
 
-# check for memory leaks during unit-tests
-valgrind --leak-check=full ./bin/check
+# check memory leaks of ./bin/arg
+# ex: check src/example.c
+# $ ./checkleak example
+
+make && valgrind -q --leak-check=full ./bin/$1
