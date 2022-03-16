@@ -26,15 +26,7 @@ typedef struct {
 } Store;
 
 
-// The store canary could prevent some memory faults
-// (If not optimized-out..)
-// For ex aliasing (buf1=buf2) :
-//   Buf owner = new_owning()
-//   Buf alias = owner // DANGER ZONE!
-//   buf_free(owner)   // checks canary : OK. Free store, erase canary.
-//   buf_free(alias) // (normally fatal) checks canary : NOPE 
 #define CANARY 1319548659
-
 #define OVERALLOC 1.6
 #define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
@@ -61,7 +53,7 @@ getcap (const Buffet *buf, Tag tag) {
     :   0;
 }
 
-// todo: dev-defensive
+// todo: defensive check tag
 static Store*
 getstore_own (Buffet *own) {
     return (Store*)(own->ptr.data - STORE_DATAOFF);
@@ -247,6 +239,12 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
+// The canary could prevent some memory faults (if not optimized-out).
+// e.g aliasing (buf1=buf2) :
+//   Buf owner = own(data)
+//   Buf alias = owner // DANGER
+//   buf_free(owner)   // checks canary : OK. Free store, erase canary.
+//   buf_free(alias)   // (normally fatal) checks canary : BAD. Do nothing. 
 void
 buffet_free (Buffet *buf)
 {
@@ -266,7 +264,7 @@ buffet_free (Buffet *buf)
             *buf = ZERO;
             return;
         }
-
+        // LOG("read refcnt");
         if (!(store->refcnt-1)) {
             store->canary = 0;
             free(store);
