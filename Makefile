@@ -1,8 +1,8 @@
 CC = gcc
 OPTIM = -Og
 WARN = -Wall -Wextra -Wno-unused-function -Wno-unused-variable 
-CP = $(CC) -std=c11 $(OPTIM) $(WARN) -g
-LINK = $(CP) $^ -o $@
+CP = $(CC) -std=c11 $(WARN) -g
+LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin)
 
@@ -16,7 +16,7 @@ all: $(lib) $(check) $(example) $(try) #$(asm)
 	
 $(lib): src/buffet.c src/buffet.h
 	@ echo $@
-	@ $(CP) -c $< -o $@
+	$(CP) $(OPTIM) -c $< -o $@
 
 $(asm): $(lib)
 	@ echo $@
@@ -25,12 +25,12 @@ $(asm): $(lib)
 
 $(check): src/check.c $(lib)
 	@ echo $@
-	@ $(CP) $< $(lib) -o $@
+	@ $(CP) -Og $< $(lib) -o $@
 	@ ./$@
 
 $(example): src/example.c $(lib)
 	@ echo $@
-	@ $(LINK)
+	@ $(LINK) 
 
 $(try): src/try.c $(lib)
 	@ echo $@
