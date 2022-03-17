@@ -1,7 +1,13 @@
 # Buffet
 
 *All-inclusive Buffer for C*  
-(Experiment - not yet stable or optimized)  
+
+#### Caveat
+Still experimental : 
+- not stable or feature-complete
+- not unit-tested for *all* bounds, paths and corner-cases
+- not optimized
+- not thread-safe
 
 :orange_book: [API](#API)  
 
@@ -38,15 +44,10 @@ union Buffet {
 }
 ```  
 The tag sets how a *Buffet* is interpreted :
-- *SSO* : as a char array
-- *OWN* : as owning heap-allocated data
-- *REF* : as a slice of owned data
-- *VUE* : as a slice of other data 
-
-The `ptr` sub-type covers :
-- *OWN* : with `aux` as capacity
-- *REF* : with `aux` as offset
-- *VUE* : with `aux` as offset
+- `SSO` : as a char array
+- `OWN` : as owning heap-allocated data (with `aux` as capacity)
+- `REF` : as a slice of owned data (with `aux` as offset)
+- `VUE` : as a slice of other data (with `aux` as offset)
 
 Any *proper* data (*SSO*/*OWN*) is null-terminated.  
 
@@ -114,7 +115,7 @@ rain is wet
 [buffet_export](#buffet_export)  
 
 [buffet_print](#buffet_print)  
-[buffet_dbg](#buffet_dbg)  
+[buffet_debug](#buffet_debug)  
 
 ### buffet_new
 ```C
@@ -125,7 +126,7 @@ Create a *Buffet* of capacity at least `cap`.
 ```C
 Buffet buf;
 buffet_new(&buf, 20);
-buffet_dbg(&buf); 
+buffet_debug(&buf); 
 // tag:OWN cap:32 len:0 data:''
 ```
 
@@ -138,7 +139,7 @@ Copy `len` bytes from string `src` into new Buffet `dst`.
 ```C
 Buffet copy;
 buffet_strcopy(&copy, "Bonjour", 3);
-buffet_dbg(&copy); 
+buffet_debug(&copy); 
 // tag:SSO cap:14 len:3 data:'Bon'
 
 ```
@@ -154,7 +155,7 @@ You get a window into `src`. No copy or allocation is done.
 char src[] = "Eat Buffet!";
 Buffet view;
 buffet_strview(&view, src+4, 3);
-buffet_dbg(&view);
+buffet_debug(&view);
 // tag:VUE cap:0 len:6 data:'Buffet!'
 buffet_print(&view);
 // Buf
@@ -171,10 +172,10 @@ Create a new *Buffet* by copying `len` bytes from Buffet `src`, starting at offs
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create a new *Buffet* by viewing `len` bytes Buffet `src`, starting at offset `off`.  
+Create a new *Buffet* by viewing `len` bytes from Buffet `src`, starting at offset `off`.  
 The return is internally either 
 - a *REF* if `src` is owning
-- a *REF* to the origin if `src` is itself a *REF*
+- a *REF* to the origin if `src` is *REF*
 - a *VUE* on `src` data if `src` is *SSO* or *VUE*
 
 `src` now cannot be released before either  
@@ -185,7 +186,7 @@ The return is internally either
 Buffet src;
 buffet_strcopy(&src, "Bonjour", 7);
 Buffet ref = buffet_view(&src, 0, 3);
-buffet_dbg(&ref);   // tag:VUE cap:0 len:3 data:'Bonjour'
+buffet_debug(&ref);   // tag:VUE cap:0 len:3 data:'Bonjour'
 buffet_print(&ref); // Bon
 ```
 
@@ -206,21 +207,21 @@ char text[] = "Le grand orchestre de Patato Valdez";
 
 Buffet own;
 buffet_strcopy(&own, text, sizeof(text));
-buffet_dbg(&own);
+buffet_debug(&own);
 // tag:OWN data:'Le grand orchestre de Patato Valdez'
 
 Buffet ref = buffet_view(&own, 22, 13);
-buffet_dbg(&ref);
+buffet_debug(&ref);
 // tag:REF data:'Patato Valdez'
 
 // Too soon but marked for release
 buffet_free(&own);
-buffet_dbg(&own);
+buffet_debug(&own);
 // tag:OWN data:'Le grand orchestre de Patato Valdez'
 
 // Release last ref, hence owner
 buffet_free(&ref);
-buffet_dbg(&own);
+buffet_debug(&own);
 // tag:SSO data:''
 ```
 
@@ -238,11 +239,44 @@ If over capacity, `dst` gets reallocated.
 Buffet buf;
 buffet_strcopy(&buf, "abc", 3); 
 size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
-buffet_dbg(&buf);
+buffet_debug(&buf);
 // tag:SSO cap:14 len:6 data:'abcdef'
 ```
 
 
+### buffet_split
+```C
+Buffet* buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
+    int *outcnt)
+```
+Splits `src` along separator `sep` into a Buffet list of resulting length `*outcnt`.  
+The list can be freed using `buffet_list_free(list, cnt)`
+
+```C
+int cnt;
+Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
+for (int i=0; i<cnt; ++i) {
+    buffet_debug(&parts[i]);
+}
+// tag:VUE cap:0 len:5 data:'Split me' cstr:'Split'
+// tag:VUE cap:0 len:2 data:'me' cstr:'me'
+```
+
+
+
+### buffet_join
+```C
+Buffet buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen);
+```
+Joins `list` on separator `sep` into a new Buffet.  
+
+```C
+int cnt;
+Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
+Buffet back = buffet_join(parts, cnt, " ", 1);
+buffet_debug(&back);
+// tag:SSO cap:14 len:8 data:'Split me' cstr:'Split me'
+```
 
 
 ### buffet_cap  
@@ -285,15 +319,15 @@ Prints data up to `buf.len`.
 void buffet_print (const Buffet *buf)`
 ```
 
-### buffet_dbg  
+### buffet_debug  
 Prints *buf* state.  
 ```C
-void buffet_dbg (Buffet *buf)
+void buffet_debug (Buffet *buf)
 ```
 
 ```C
 Buffet buf;
 buffet_strcopy(&buf, "foo", 3);
-buffet_dbg(&buf);
+buffet_debug(&buf);
 // tag:SSO cap:14 len:3 data:'foo'
 ```

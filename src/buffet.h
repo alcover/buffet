@@ -24,8 +24,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdbool.h>
 
 #define BUFFET_SIZE 16
-#define BUFFET_SSO (BUFFET_SIZE-2)
-#define BUFFET_TAG 2
+#define BUFFET_SSO (BUFFET_SIZE-2) // max inline length
+#define BUFFET_TAG 2 // flag bits
 
 typedef union Buffet {
         
@@ -47,13 +47,21 @@ typedef union Buffet {
 } Buffet;
 
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void    buffet_new (Buffet *dst, size_t cap);
 void    buffet_strcopy (Buffet *dst, const char *src, size_t len);
 void    buffet_strview (Buffet *dst, const char *src, size_t len);
 Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
 Buffet  buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
 size_t  buffet_append (Buffet *dst, const char *src, size_t len);
+Buffet* buffet_split (const char* src, size_t srclen,
+               const char* sep, size_t seplen, int *outcnt);
+Buffet  buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen);
 void    buffet_free (Buffet *buf);
+void    buffet_list_free (Buffet *list, int cnt);
 
 size_t  buffet_cap (const Buffet *buf);
 size_t  buffet_len (const Buffet *buf);
@@ -62,6 +70,10 @@ const char* buffet_cstr (const Buffet *buf, bool *mustfree);
 char*   buffet_export (const Buffet *buf);
 
 void    buffet_print (const Buffet *buf);
-void    buffet_dbg (Buffet *buf);
+void    buffet_debug (const Buffet *buf);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif //guard

@@ -23,9 +23,8 @@ const char alpha[] =
 const size_t alphalen = 64;
 char tmp[100];
 
-//==============================================================================
-static void 
-check_free (Buffet *b)
+//=============================================================================
+void check_free (Buffet *b)
 {
     buffet_free(b);
 
@@ -37,15 +36,13 @@ check_free (Buffet *b)
     assert(!mustfree);
 }
 
-static char* 
-take(size_t off, size_t len) {
+static char* take (size_t off, size_t len) {
     memcpy(tmp, alpha+off, len);
     tmp[len] = 0;
     return tmp;
 }
 
-static void 
-check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
+void check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
 {
     bool mustfree;
     const char *cstr = buffet_cstr(b, &mustfree);
@@ -57,8 +54,7 @@ check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
     if (expfree) free((char*)cstr);
 }
 
-static void 
-check_export (Buffet *b, size_t off, size_t len)
+void check_export (Buffet *b, size_t off, size_t len)
 {
     char *export = buffet_export(b);
     const char *expstr = take(off,len);
@@ -66,9 +62,8 @@ check_export (Buffet *b, size_t off, size_t len)
     free(export);
 }
 
-//==============================================================================
-static void 
-u_new (size_t cap) 
+//=============================================================================
+void u_new (size_t cap) 
 {
     Buffet b; 
     buffet_new (&b, cap); 
@@ -87,7 +82,7 @@ u_new((n)-1); \
 u_new((n)); \
 u_new((n)+1);
 
-static void new() 
+void new() 
 { 
     u_new (0);
     u_new (1);
@@ -101,9 +96,8 @@ static void new()
     // u_new (UINT32_MAX);
 }
 
-//==============================================================================
-static void 
-u_strcopy (size_t off, size_t len)
+//=============================================================================
+void u_strcopy (size_t off, size_t len)
 {
     Buffet b;
     buffet_strcopy (&b, alpha+off, len);
@@ -116,7 +110,7 @@ u_strcopy (size_t off, size_t len)
     buffet_free(&b);
 }
 
-static void strcopy() 
+void strcopy() 
 {
     u_strcopy (0, 0); 
     u_strcopy (0, 1); 
@@ -137,8 +131,8 @@ static void strcopy()
     u_strcopy (8, 40);
 }
 
-//==============================================================================
-static void u_strview (size_t off, size_t len)
+//=============================================================================
+void u_strview (size_t off, size_t len)
 {
     Buffet b;
     buffet_strview (&b, alpha+off, len);
@@ -151,7 +145,7 @@ static void u_strview (size_t off, size_t len)
     buffet_free(&b);
 }
 
-static void strview() 
+void strview() 
 {
     u_strview (0, 0); 
     u_strview (0, 1); 
@@ -172,9 +166,8 @@ static void strview()
     u_strview (8, 40);
 }
 
-//==============================================================================
-static void 
-u_copy (size_t off, size_t len)
+//=============================================================================
+void u_copy (size_t off, size_t len)
 {
     Buffet src;
     buffet_strcopy (&src, alpha, alphalen);
@@ -189,7 +182,7 @@ u_copy (size_t off, size_t len)
     buffet_free(&src);
 }
 
-static void copy()
+void copy()
 {
     u_copy (0, 0); 
     u_copy (0, 1); 
@@ -211,10 +204,9 @@ static void copy()
     u_copy (0, alphalen);
 }
 
-//==============================================================================
+//=============================================================================
 
-static void 
-u_view (size_t srclen, size_t off, size_t len)
+void u_view (size_t srclen, size_t off, size_t len)
 {
     Buffet src;
     buffet_strcopy (&src, alpha, srclen);
@@ -229,8 +221,7 @@ u_view (size_t srclen, size_t off, size_t len)
     buffet_free(&src);
 }
 
-static void 
-u_view_ref (size_t off, size_t len)
+void u_view_ref (size_t off, size_t len)
 {
     Buffet b;
     buffet_strcopy (&b, alpha, alphalen);
@@ -247,8 +238,7 @@ u_view_ref (size_t off, size_t len)
     buffet_free(&b);
 }
 
-static void 
-u_view_vue (size_t off, size_t len)
+void u_view_vue (size_t off, size_t len)
 {
     Buffet src;
     buffet_strview (&src, alpha, alphalen);
@@ -264,7 +254,7 @@ u_view_vue (size_t off, size_t len)
 }
 
 // TODO fill-up refcnt
-static void view()
+void view()
 {
     // on SSO
     u_view (8, 0, 0);
@@ -288,11 +278,10 @@ static void view()
     u_view_vue (0, 40);
 }
 
-//==============================================================================
+//=============================================================================
 // Confusing and certainly not covering all paths..
 
-static void 
-u_append_new (size_t cap, size_t len)
+void u_append_new (size_t cap, size_t len)
 {
     Buffet b;
     buffet_new (&b, cap);
@@ -306,8 +295,7 @@ u_append_new (size_t cap, size_t len)
     buffet_free(&b);    
 }
 
-static void 
-u_append_strcopy (size_t initlen, size_t len)
+void u_append_strcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
@@ -322,8 +310,7 @@ u_append_strcopy (size_t initlen, size_t len)
     buffet_free(&b);    
 }
 
-static void 
-u_append_strview (size_t initlen, size_t len)
+void u_append_strview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
@@ -338,8 +325,7 @@ u_append_strview (size_t initlen, size_t len)
     buffet_free(&b);    
 }
 
-static void 
-u_append_view (size_t initlen, size_t len)
+void u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet src;
@@ -356,7 +342,7 @@ u_append_view (size_t initlen, size_t len)
     buffet_free(&src);    
 }
 
-static void append()
+void append()
 {
     u_append_new (0, 0);
     u_append_new (0, 8);
@@ -391,8 +377,89 @@ static void append()
     u_append_view (20, 20);
 }
 
+//=============================================================================
+void usplit (const char* str, const char* sep, int expc, const char* exps[])
+{
+    int cnt = 0;
+    Buffet *parts = buffet_split(str, strlen(str), sep, strlen(sep), &cnt);
+    Buffet s;
+    size_t i=0;
+
+    assert_int(cnt,expc);
+
+    for (int i=0; i<cnt; i++) {
+        Buffet *part = parts+i;
+        const char* exp = exps[i];
+        size_t explen = strlen(exp);
+
+        assert_int (buffet_len(part), explen);
+        assert_strn (buffet_data(part), exp, explen);
+    }
+
+    buffet_list_free(parts, cnt);
+}
+
+// merged with join tests
+void split()
+{
+    usplit ("a,b", ",", 2, (const char*[]){"a","b"});
+}
+
+
 //==============================================================================
-static void free_()
+
+#define u_joinback(src, sep) \
+{ \
+    size_t srclen = strlen(src);\
+    size_t seplen = strlen(sep);\
+    int cnt; \
+    Buffet* parts = buffet_split (src, srclen, sep, seplen, &cnt); \
+    Buffet joined = buffet_join (parts, cnt, sep, seplen); \
+    assert_str (buffet_data(&joined), src); \
+    assert_int (buffet_len(&joined), srclen); \
+    buffet_list_free(parts, cnt);\
+    buffet_free(&joined);\
+}
+
+void join() 
+{ 
+    u_joinback ("", "|");
+    u_joinback ("|", "|");
+    u_joinback ("a", "|");
+    u_joinback ("a|", "|"); 
+    u_joinback ("a|b", "|"); 
+    u_joinback ("a|b|", "|"); 
+    u_joinback ("|a", "|");
+    u_joinback ("|a|", "|"); 
+    u_joinback ("|a|b", "|"); 
+    u_joinback ("|a|b|", "|"); 
+    u_joinback ("a||", "|"); 
+    u_joinback ("a||b", "|"); 
+    u_joinback ("a||b||", "|"); 
+    u_joinback ("||a", "|");
+    u_joinback ("||a||", "|"); 
+    u_joinback ("||a||b", "|"); 
+    u_joinback ("||a||b||", "|"); 
+    
+    u_joinback ("abc", "|"); 
+    u_joinback ("abc|", "|"); 
+    u_joinback ("abc|def", "|"); 
+    u_joinback ("abc|def|", "|"); 
+    u_joinback ("|abc", "|"); 
+    u_joinback ("|abc|", "|"); 
+    u_joinback ("|abc|def", "|"); 
+    u_joinback ("|abc|def|", "|"); 
+    u_joinback ("abc||", "|"); 
+    u_joinback ("abc||def", "|"); 
+    u_joinback ("abc||def||", "|"); 
+    u_joinback ("||abc", "|"); 
+    u_joinback ("||abc||", "|"); 
+    u_joinback ("||abc||def", "|"); 
+    u_joinback ("||abc||def||", "|"); 
+}
+
+//=============================================================================
+void free_()
 {
     {
         Buffet b; 
@@ -437,7 +504,7 @@ static void free_()
     }
 }
 
-//==============================================================================
+//=============================================================================
 
 int main()
 {
@@ -449,6 +516,8 @@ int main()
     copy();
     view();
     append();
+    split();
+    join();
     free_();
 
     printf ("OK\n");

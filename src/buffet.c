@@ -53,6 +53,11 @@ getcap (const Buffet *buf, Tag tag) {
     :   0;
 }
 
+static void 
+setlen (Buffet *buf, size_t len) {
+    if (TYPE(buf)) buf->ptr.len = len; else buf->sso.len = len;
+}
+
 // todo: defensive check tag
 static Store*
 getstore_own (Buffet *own) {
@@ -138,7 +143,7 @@ grow_own (Buffet *buf, size_t newcap)
 }
 
 static void
-print_type (Buffet *buf, char *out) {
+print_type (const Buffet *buf, char *out) {
     switch(TYPE(buf)) {
         case SSO: sprintf(out,"SSO"); break;
         case OWN: sprintf(out,"OWN"); break;
@@ -339,6 +344,110 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
     return newlen;
 }
 
+#define BUFFET_STACK_MEM 1024
+#define LIST_LOCAL_MAX (BUFFET_STACK_MEM/sizeof(Buffet))
+
+Buffet*
+buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
+    int *outcnt)
+{
+    int curcnt = 0; 
+    Buffet *ret = NULL;
+    
+    Buffet  list_local[LIST_LOCAL_MAX]; 
+    Buffet *list = list_local;
+    bool local = true;
+    int listmax = LIST_LOCAL_MAX;
+
+    const char *beg = src;
+    const char *end = src;
+
+    while ((end = strstr(end, sep))) {
+
+        if (curcnt >= listmax-1) {
+
+            listmax *= 2;
+            size_t newsz = listmax * sizeof(Buffet);
+
+            if (local) {
+                list = malloc(newsz); 
+                if (!list) {curcnt = 0; goto fin;}
+                memcpy (list, list_local, curcnt * sizeof(Buffet));
+                local = false;
+            } else {
+                list = realloc(list, newsz); 
+                if (!list) {curcnt = 0; goto fin;}
+            }
+        }
+
+        buffet_strview (&list[curcnt++], beg, end-beg);
+        end += seplen;
+        beg = end;
+    };
+    
+    // last part
+    buffet_strview (&list[curcnt++], beg, src+srclen-beg);
+
+    if (local) {
+        ret = malloc(curcnt * sizeof(Buffet));
+        memcpy (ret, list, curcnt * sizeof(Buffet));
+    } else {
+        ret = list;  
+    }
+
+    fin:
+    *outcnt = curcnt;
+    return ret;
+}
+
+
+void
+buffet_list_free (Buffet *list, int cnt)
+{
+    Buffet *elt = list;
+    while(cnt--) {
+        buffet_free(elt++); //useless if split-view
+    }
+    free(list);
+}
+
+
+Buffet 
+buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen)
+{
+    // opt: local if small; no alloc if too big
+    size_t *lengths = malloc(cnt*sizeof(*lengths));
+    size_t totlen = 0;
+
+    for (int i=0; i < cnt; ++i) {
+        size_t len = getlen(&list[i]);
+        totlen += len;
+        lengths[i] = len;
+    }
+    totlen += (cnt-1)*seplen;
+    
+    Buffet ret;
+    buffet_new(&ret, totlen);
+    char* cur = (char*)getdata(&ret);
+    cur[totlen] = 0; 
+
+    for (int i=0; i < cnt; ++i) {
+        const char *eltdata = getdata(&list[i]);
+        size_t eltlen = lengths[i];
+        memcpy(cur, eltdata, eltlen);
+        cur += eltlen;
+        if (i<cnt-1) {
+            memcpy(cur, sep, seplen);
+            cur += seplen;
+        }
+    }    
+
+    setlen(&ret, totlen);
+    free(lengths);
+    
+    return ret;
+}
+
 
 // todo no allocation if ref/vue whole len or stops at end
 const char*
@@ -414,10 +523,15 @@ buffet_print (const Buffet *buf) {
 }
 
 void 
-buffet_dbg (Buffet* buf) 
+buffet_debug (const Buffet* buf) 
 {
     char tag[5];
     print_type(buf, tag);
-    printf ("tag:%s cap:%zu len:%zu data:'%s'\n", 
-        tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf));
+    bool mustfree;
+    const char *cstr = buffet_cstr(buf, &mustfree);
+
+    printf ("tag:%s cap:%zu len:%zu data:'%s' cstr:'%s'\n", 
+    tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf), cstr);
+
+    if (mustfree) free((char*)cstr);
 }
