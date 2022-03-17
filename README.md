@@ -106,6 +106,8 @@ rain is wet
 [buffet_copy](#buffet_copy)  
 [buffet_view](#buffet_view)  
 [buffet_append](#buffet_append)  
+[buffet_split](#buffet_split)  
+[buffet_join](#buffet_join)  
 [buffet_free](#buffet_free)  
 
 [buffet_cap](#buffet_cap)  
