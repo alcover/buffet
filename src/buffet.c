@@ -26,7 +26,7 @@ typedef struct {
 } Store;
 
 
-#define CANARY 1319548659
+#define CANARY 0xAAAAAAAA
 #define OVERALLOC 1.6
 #define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
@@ -119,6 +119,22 @@ new_own (Buffet *dst, size_t cap, const char *src, size_t len)
     return data;
 }
 
+
+static void
+new_ref (Buffet *dst, const char *owned, ptrdiff_t off, size_t len) 
+{
+    *dst = (Buffet) {
+        .ptr.data = (char*)(owned + off),
+        .ptr.len = len,
+        .ptr.aux = off/STEP,
+        .ptr.tag = REF     
+    };
+
+    Store *store = (Store*)(owned-STORE_DATAOFF);
+    ++ store->refcnt;
+}
+
+
 // separate for future buffet_grow()
 static char*
 grow_sso (Buffet *buf, size_t newcap)
@@ -201,26 +217,11 @@ buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
-static void
-view_data (Buffet *dst, const char *ownerdata, ptrdiff_t off, size_t len) 
-{
-    *dst = (Buffet) {
-        .ptr.data = (char*)(ownerdata + off),
-        .ptr.len = len,
-        .ptr.aux = off/STEP,
-        .ptr.tag = REF     
-    };
-
-    Store *store = (Store*)(ownerdata-STORE_DATAOFF);
-    ++ store->refcnt;
-}
-
-
 Buffet
 buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 {
     const char *data = getdata(src); 
-    Buffet ret;// = ZERO;
+    Buffet ret;
     
     switch(TYPE(src)) {
         
@@ -230,13 +231,13 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
         }   break;
         
         case OWN: {
-            view_data (&ret, data, off, len);
+            new_ref (&ret, data, off, len);
         }   break;
         
         case REF: {
             uint32_t refoff = REFOFF(src);
             const char *ownerdata = data-refoff; 
-            view_data (&ret, ownerdata, refoff+off, len);
+            new_ref (&ret, ownerdata, refoff+off, len);
         }   break;
     }
 
@@ -348,7 +349,7 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
 #define LIST_LOCAL_MAX (BUFFET_STACK_MEM/sizeof(Buffet))
 
 Buffet*
-buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
+buffet_splitstr (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 {
     int curcnt = 0; 
@@ -444,7 +445,7 @@ buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen)
 
     setlen(&ret, totlen);
     free(lengths);
-    
+
     return ret;
 }
 

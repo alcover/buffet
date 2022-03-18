@@ -105,7 +105,7 @@ brain
 [buffet_copy](#buffet_copy)  
 [buffet_view](#buffet_view)  
 [buffet_append](#buffet_append)  
-[buffet_split](#buffet_split)  
+[buffet_splitstr](#buffet_splitstr)  
 [buffet_join](#buffet_join)  
 [buffet_free](#buffet_free)  
 
@@ -268,9 +268,9 @@ buffet_debug(&buf);
 ```
 
 
-### buffet_split
+### buffet_splitstr
 ```C
-Buffet* buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
+Buffet* buffet_splitstr (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 ```
 Splits `src` along separator `sep` into a Buffet list of resulting length `*outcnt`.  
@@ -278,7 +278,7 @@ The list can be freed using `buffet_list_free(list, cnt)`
 
 ```C
 int cnt;
-Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
+Buffet *parts = buffet_splitstr("Split me", 8, " ", 1, &cnt);
 for (int i=0; i<cnt; ++i)
     buffet_debug(&parts[i]);
 buffet_list_free(parts, cnt);
@@ -296,7 +296,7 @@ Joins `list` on separator `sep` into a new Buffet.
 
 ```C
 int cnt;
-Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
+Buffet *parts = buffet_splitstr("Split me", 8, " ", 1, &cnt);
 Buffet back = buffet_join(parts, cnt, " ", 1);
 buffet_debug(&back);
 // tag:SSO cap:14 len:8 data:'Split me' cstr:'Split me'

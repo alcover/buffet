@@ -381,7 +381,7 @@ void append()
 void usplit (const char* str, const char* sep, int expc, const char* exps[])
 {
     int cnt = 0;
-    Buffet *parts = buffet_split(str, strlen(str), sep, strlen(sep), &cnt);
+    Buffet *parts = buffet_splitstr(str, strlen(str), sep, strlen(sep), &cnt);
 
     assert_int(cnt,expc);
 
@@ -411,7 +411,7 @@ void split()
     size_t srclen = strlen(src);\
     size_t seplen = strlen(sep);\
     int cnt; \
-    Buffet* parts = buffet_split (src, srclen, sep, seplen, &cnt); \
+    Buffet* parts = buffet_splitstr (src, srclen, sep, seplen, &cnt); \
     Buffet joined = buffet_join (parts, cnt, sep, seplen); \
     assert_str (buffet_data(&joined), src); \
     assert_int (buffet_len(&joined), srclen); \
