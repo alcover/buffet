@@ -135,7 +135,7 @@ buffet_debug(&buf);
 ```C
 void buffet_strcopy (Buffet *dst, const char *src, size_t len)
 ```
-Copy `len` bytes from string `src` into new Buffet `dst`.  
+Create new Buffet `dst` importing `len` bytes from string `src`.  
 
 ```C
 Buffet copy;
@@ -149,8 +149,8 @@ buffet_debug(&copy);
 ```C
 void buffet_strview (Buffet *dst, const char *src, size_t len)
 ```
-View `len` bytes from string `src` into new Buffet `dst`.  
-You get a window into `src`. No copy or allocation is done.
+Create new Buffet `dst` viewing `len` bytes from string `src`.  
+You get a window into `src`. No copy or allocation.
 
 ```C
 char src[] = "Eat Buffet!";
@@ -166,29 +166,52 @@ buffet_print(&view);
 ```C
 Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create a new Buffet by copying `len` bytes from Buffet `src`, starting at offset `off`.  
+Create new Buffet importing `len` bytes from Buffet `src`, starting at offset `off`.  
 
 
 ### buffet_view
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create a new Buffet by viewing `len` bytes from Buffet `src`, starting at offset `off`.  
+Create new Buffet viewing `len` bytes from Buffet `src`, starting at offset `off`.  
 The return is internally either 
-- a *REF* if `src` is owning
-- a *REF* to the origin if `src` is *REF*
+- a *REF* if `src` is *OWN*
+- a *REF* to origin if `src` is *REF*
 - a *VUE* on `src` data if `src` is *SSO* or *VUE*
 
-`src` now cannot be released before either  
+If a *REF* is returned, `src` now cannot be released before either  
 - the return is released
 - the return is detached as owner, e.g. when you `append` to it.
 
 ```C
-Buffet src;
-buffet_strcopy(&src, "Bonjour", 7);
-Buffet ref = buffet_view(&src, 0, 3);
-buffet_debug(&ref);   // tag:VUE cap:0 len:3 data:'Bonjour'
-buffet_print(&ref); // Bon
+// view own
+Buffet own;
+buffet_strcopy(&own, "Bonjour monsieur", 16);
+Buffet ref1 = buffet_view(&own, 0, 7);
+buffet_debug(&ref1); // tag:REF len:7 cstr:'Bonjour'
+
+// view ref
+Buffet ref2 = buffet_view(&ref1, 0, 3);
+buffet_debug(&ref2); // tag:REF len:3 cstr:'Bon'
+
+// detach views
+buffet_append(&ref2, "net", 3);
+buffet_debug(&ref2); // tag:SSO len:6 cstr:'Bonnet'
+buffet_append(&ref1, "!", 1);
+buffet_debug(&ref1); // tag:SSO len:8 cstr:'Bonjour!'
+buffet_free(&own);   // OK
+
+// view vue
+Buffet vue;
+buffet_strview(&vue, "Good day", 4);
+Buffet vue2 = buffet_view(&vue, 0, 3);
+buffet_debug(&vue2); // tag:VUE len:3 cstr:'Goo'
+
+// view sso
+Buffet sso;
+buffet_strcopy(&sso, "Bonjour", 7);
+Buffet vue3 = buffet_view(&sso, 0, 3);
+buffet_debug(&vue3); // tag:VUE len:3 cstr:'Bon'
 ```
 
 
