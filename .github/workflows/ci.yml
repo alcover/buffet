@@ -2,12 +2,12 @@ on: [push, pull_request]
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-18.04
     strategy:
       fail-fast: false
       matrix:
         CC: [gcc, clang]
-        OPTIM: [-O0, -O2]
+        OPTIM: [-Og, -O2]
 
     env:
       make_options: 'CC=${{ matrix.CC }} OPTIM=${{ matrix.OPTIM }}'
