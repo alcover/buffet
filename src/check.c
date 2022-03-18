@@ -382,8 +382,6 @@ void usplit (const char* str, const char* sep, int expc, const char* exps[])
 {
     int cnt = 0;
     Buffet *parts = buffet_split(str, strlen(str), sep, strlen(sep), &cnt);
-    Buffet s;
-    size_t i=0;
 
     assert_int(cnt,expc);
 
