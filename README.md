@@ -2,27 +2,26 @@
 
 *All-inclusive Buffer for C*  
 
-#### Caveat
-Still experimental : 
-- not stable or feature-complete
-- not unit-tested for *all* bounds, paths and corner-cases
-- not optimized
-- not thread-safe
-
-:orange_book: [API](#API)  
-
-![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
+:orange_book: [**API**](#API)    ![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
 
 ![schema](assets/buffet.png)  
 
 *Buffet* is a polymorphic string buffer type featuring :
-- **SSO** (small string optimization) : short data is stored inline
+- **SSO** (small string optimization) : short data stored inline
 - **views** : no-cost references to slices of data  
-- **reference counting** : secures the release of views and owned data
+- **reference counting** : secure release of views and owned data
 - **cstr** : obtain a null-terminated C string
-- automated (re)allocations  
+- automated (re)allocations
 
-In a mere register-fitting **16 bytes**.
+In mere register-fitting **16 bytes**.  
+
+
+:construction: Caveat : still experimental  
+\- not yet stable, optimized or feature-complete  
+\- not yet unit-tested for *all* paths and corner-cases  
+\- probably not thread-safe  
+
+---
 
 ## How
 
@@ -43,7 +42,7 @@ union Buffet {
     } sso
 }
 ```  
-The tag sets how a *Buffet* is interpreted :
+The tag sets how a Buffet is interpreted :
 - `SSO` : as a char array
 - `OWN` : as owning heap-allocated data (with `aux` as capacity)
 - `REF` : as a slice of owned data (with `aux` as offset)
@@ -54,8 +53,6 @@ Any *proper* data (*SSO*/*OWN*) is null-terminated.
 ![schema](assets/schema.png)
 
 
-
-## Usage
 
 ### Build & unit-test
 
@@ -69,21 +66,23 @@ Any *proper* data (*SSO*/*OWN*) is null-terminated.
 
 int main()
 {
-    char text[] = "The train is fast";
+    char text[] = "The train goes.";
 
+    Buffet own;
+    buffet_strcopy (&own, text, sizeof(text));
+
+    Buffet ref = buffet_view (&own, 4, 5);
+    buffet_print(&ref); // "train"
+
+    buffet_append (&ref, "ing", 3);
+    buffet_print(&ref); // "training"
+    
     Buffet vue;
     buffet_strview (&vue, text+4, 5);
-    buffet_print(&vue);
+    buffet_print(&vue); // "train"
 
     text[4] = 'b';
-    buffet_print(&vue);
-
-    Buffet ref = buffet_view (&vue, 1, 4);
-    buffet_print(&ref);
-
-    char wet[] = " is wet";
-    buffet_append (&ref, wet, sizeof(wet));
-    buffet_print(&ref);
+    buffet_print(&vue); // "brain"
 
     return 0;
 }
@@ -92,11 +91,11 @@ int main()
 ```
 $ gcc example.c buffet -o example && ./example
 train
+training
+train
 brain
-rain
-rain is wet
 ```
-
+---
 
 # API
 
@@ -123,7 +122,7 @@ rain is wet
 ```C
 void buffet_new (Buffet *dst, size_t cap)
 ```
-Create a *Buffet* of capacity at least `cap`.  
+Create a Buffet of capacity at least `cap`.  
 
 ```C
 Buffet buf;
@@ -167,14 +166,14 @@ buffet_print(&view);
 ```C
 Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create a new *Buffet* by copying `len` bytes from Buffet `src`, starting at offset `off`.  
+Create a new Buffet by copying `len` bytes from Buffet `src`, starting at offset `off`.  
 
 
 ### buffet_view
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create a new *Buffet* by viewing `len` bytes from Buffet `src`, starting at offset `off`.  
+Create a new Buffet by viewing `len` bytes from Buffet `src`, starting at offset `off`.  
 The return is internally either 
 - a *REF* if `src` is owning
 - a *REF* to the origin if `src` is *REF*
@@ -182,7 +181,7 @@ The return is internally either
 
 `src` now cannot be released before either  
 - the return is released
-- the return is detached as owner (e.g. when you `append()` to it).
+- the return is detached as owner, e.g. when you `append` to it.
 
 ```C
 Buffet src;
@@ -257,9 +256,9 @@ The list can be freed using `buffet_list_free(list, cnt)`
 ```C
 int cnt;
 Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
-for (int i=0; i<cnt; ++i) {
+for (int i=0; i<cnt; ++i)
     buffet_debug(&parts[i]);
-}
+buffet_list_free(parts, cnt);
 // tag:VUE cap:0 len:5 data:'Split me' cstr:'Split'
 // tag:VUE cap:0 len:2 data:'me' cstr:'me'
 ```
