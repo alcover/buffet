@@ -23,6 +23,13 @@ const char alpha[] =
 const size_t alphalen = 64;
 char tmp[100];
 
+// put a slice of alpha into tmp
+static char* take (size_t off, size_t len) {
+    memcpy(tmp, alpha+off, len);
+    tmp[len] = 0;
+    return tmp;
+}
+
 //=============================================================================
 void check_free (Buffet *b)
 {
@@ -36,12 +43,6 @@ void check_free (Buffet *b)
     assert(!mustfree);
 }
 
-static char* take (size_t off, size_t len) {
-    memcpy(tmp, alpha+off, len);
-    tmp[len] = 0;
-    return tmp;
-}
-
 void check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
 {
     bool mustfree;
@@ -49,6 +50,12 @@ void check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
     const char *expstr = take(off,len);
 
     assert_str (cstr, expstr);
+    
+    if (mustfree!=expfree) {
+        LOG("expfree:%d != mustfree:%d off:%zu len:%zu", 
+            expfree, mustfree, off, len);
+        buffet_debug(b); fflush(stdout);
+    }
     assert (mustfree == expfree);
 
     if (expfree) free((char*)cstr);
@@ -206,7 +213,7 @@ void copy()
 
 //=============================================================================
 
-void u_view (size_t srclen, size_t off, size_t len)
+void u_view (size_t srclen, size_t off, size_t len, bool mustfree)
 {
     Buffet src;
     buffet_strcopy (&src, alpha, srclen);
@@ -214,23 +221,23 @@ void u_view (size_t srclen, size_t off, size_t len)
 
     assert_int (buffet_len(&view), len);
     assert_strn (buffet_data(&view), alpha+off, len);
-    check_cstr (&view, off, len, true);
+    check_cstr (&view, off, len, mustfree);
     check_export (&view, off, len);
     
     buffet_free(&view);
     buffet_free(&src);
 }
 
-void u_view_ref (size_t off, size_t len)
+void u_view_ref (size_t srclen, size_t off, size_t len, bool mustfree)
 {
     Buffet b;
     buffet_strcopy (&b, alpha, alphalen);
-    Buffet src = buffet_view (&b, 0, alphalen);
+    Buffet src = buffet_view (&b, 0, srclen);
     Buffet view = buffet_view (&src, off, len);
 
     assert_int (buffet_len(&view), len);
     assert_strn (buffet_data(&view), alpha+off, len);
-    check_cstr (&view, off, len, true);
+    check_cstr (&view, off, len, mustfree);
     check_export (&view, off, len); 
     
     buffet_free(&view);
@@ -240,9 +247,9 @@ void u_view_ref (size_t off, size_t len)
 
 void u_view_vue (size_t off, size_t len)
 {
-    Buffet src;
-    buffet_strview (&src, alpha, alphalen);
-    Buffet view = buffet_view (&src, off, len);
+    Buffet vue;
+    buffet_strview (&vue, alpha, alphalen);
+    Buffet view = buffet_view (&vue, off, len);
 
     assert_int (buffet_len(&view), len);
     assert_strn (buffet_data(&view), alpha+off, len);
@@ -250,29 +257,30 @@ void u_view_vue (size_t off, size_t len)
     check_export (&view, off, len);
 
     buffet_free(&view);
-    buffet_free(&src);
+    buffet_free(&vue);
 }
 
 // TODO fill-up refcnt
 void view()
 {
     // on SSO
-    u_view (8, 0, 0);
-    u_view (8, 0, 4);
-    u_view (8, 0, 8);
-    u_view (8, 2, 6);
-    u_view (8, 4, 4);
+    u_view (8, 0, 0, true);
+    u_view (8, 0, 4, true);
+    u_view (8, 0, 8, false); //whole
+    u_view (8, 2, 4, true);
+    u_view (8, 2, 6, false); //till end
     // on OWN
-    u_view (40, 0, 0);
-    u_view (40, 0, 8);
-    u_view (40, 0, 38);
-    u_view (40, 0, 40);
-    u_view (40, 2, 38);
+    u_view (40, 0, 0, true);
+    u_view (40, 0, 20, true);
+    u_view (40, 0, 40, false);
+    u_view (40, 20, 10, true);
+    u_view (40, 20, 20, false);
     // on REF
-    u_view_ref (0,8);
-    u_view_ref (0,40);
-    u_view_ref (2,8);
-    u_view_ref (2,40);
+    u_view_ref (40, 0, 0, true);
+    u_view_ref (40, 0, 20, true);
+    u_view_ref (40, 0, 40, true);
+    u_view_ref (40, 20, 10, true);
+    u_view_ref (40, 20, 20, true);
     // on VUE
     u_view_vue (0, 8);
     u_view_vue (0, 40);
@@ -493,7 +501,6 @@ void free_()
         check_free(&cpy);
         buffet_free(&own);
     }
-
     {   // double free
         Buffet b; 
         buffet_strcopy (&b, alpha, 40); 
