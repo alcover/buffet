@@ -25,16 +25,14 @@ typedef struct {
     char     data[1];
 } Store;
 
-
 #define CANARY 0xAAAAAAAA
 #define OVERALLOC 1.6
-#define STEP (1ull<<BUFFET_TAG)
 #define ZERO ((Buffet){.fill={0}})
-#define DATAOFF offsetof(Store,data)
 #define TAG(buf) ((buf)->sso.tag)
+#define STEP (1ull<<BUFFET_TAG)
+#define DATAOFF offsetof(Store,data)
 #define REFOFF(ref) (STEP * (ref)->ptr.aux + (intptr_t)(ref)->ptr.data % STEP)
-#define assert_aligned(p) assert(0 == (intptr_t)(p) % STEP);
-
+#define assert_aligned(ptr) assert(0 == (intptr_t)(ptr) % STEP);
 
 static const char*
 getdata (const Buffet *buf) {
@@ -55,13 +53,32 @@ getcap (const Buffet *buf, Tag tag) {
 }
 
 static void 
+dbg (const Buffet* buf) 
+{
+    char tag[10];
+    switch(TAG(buf)) {
+        case SSO: sprintf(tag,"SSO"); break;
+        case OWN: sprintf(tag,"OWN"); break;
+        case REF: sprintf(tag,"REF"); break;
+        case VUE: sprintf(tag,"VUE"); break;
+    }
+    bool mustfree;
+    const char *cstr = buffet_cstr(buf, &mustfree);
+
+    printf ("tag:%s cap:%zu len:%zu data:'%s' cstr:'%s'\n", 
+    tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf), cstr);
+
+    if (mustfree) free((char*)cstr);
+}
+
+static void 
 setlen (Buffet *buf, size_t len) {
     if (TAG(buf)) buf->ptr.len = len; else buf->sso.len = len;
 }
 
 static Store*
 getstore (Buffet *buf) {
-    ptrdiff_t off = (TAG(buf)==REF) ? REFOFF(buf) : 0; // for debug
+    ptrdiff_t off = (TAG(buf)==REF) ? REFOFF(buf) : 0;
     return (Store*)(buf->ptr.data - off - DATAOFF);
 }
 
@@ -70,7 +87,7 @@ static Store*
 new_store (size_t cap)
 {
     size_t mem = DATAOFF+cap+1;
-    Store *store = aligned_alloc (sizeof(Store), mem);
+    Store *store = aligned_alloc(sizeof(Store), mem);
 
     if (!store) {
         ERR("failed Store allocation"); 
@@ -82,7 +99,7 @@ new_store (size_t cap)
         .data = {'\0'}
     };
 
-    store->data[cap] = '\0'; // sec
+    store->data[cap] = 0;
 
     return store;
 }
@@ -91,9 +108,9 @@ new_store (size_t cap)
 static char*
 new_own (Buffet *dst, size_t cap, const char *src, size_t len)
 {
-    size_t fincap = cap;
     // round to next STEP
-    if (fincap % STEP) fincap = (fincap/STEP+1)*STEP;
+    // optim if pow2 : (cap+STEP-1)&-STEP ?
+    size_t fincap = cap+STEP-1 - (cap+STEP-1)%STEP;
 
     Store *store = new_store(fincap);
     if (!store) return NULL;
@@ -147,20 +164,11 @@ grow_own (Buffet *buf, size_t newcap)
 
     char *newdata = store->data;
     assert_aligned(newdata);
+
     buf->ptr.data = newdata;
     buf->ptr.aux = newcap/STEP; // ?
 
     return newdata;
-}
-
-static void
-print_type (const Buffet *buf, char *out) {
-    switch(TAG(buf)) {
-        case SSO: sprintf(out,"SSO"); break;
-        case OWN: sprintf(out,"OWN"); break;
-        case REF: sprintf(out,"REF"); break;
-        case VUE: sprintf(out,"VUE"); break;
-    }
 }
 
 //=============================================================================
@@ -205,6 +213,10 @@ buffet_strview (Buffet *dst, const char* src, size_t len)
 Buffet
 buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 {
+    if (off+len > getlen(src)) {
+        return ZERO;
+    }
+
     Buffet ret;
     buffet_strcopy (&ret, getdata(src)+off, len);
     return ret;
@@ -214,6 +226,10 @@ buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 Buffet
 buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 {
+    if (off+len > getlen(src)) {
+        return ZERO;
+    }
+    
     const char *data = getdata(src); 
     Buffet ret;
     
@@ -254,21 +270,29 @@ buffet_free (Buffet *buf)
         
         Store *store = getstore(buf);
 
-        if (store->canary != CANARY) {
-            ERR("bad store canary");
+        // LOG("read refcnt");
+        // assert(store->refcnt);
+
+        // protection #1 : e.g user aliased buf and freed it already.
+        if (!store->refcnt) {
+            ERR("bad refcnt");
             goto fin;
         }
 
-        // LOG("read refcnt");
-        assert(store->refcnt);
+        // protection #2 : in case #1 was defeated by overwrite
+        if (store->canary != CANARY) {
+            ERR("bad canary");
+            goto fin;
+        }
 
-        if (store->refcnt == 1) {
+        --store->refcnt;
+
+        if (!store->refcnt) {
             store->canary = 0;
             free(store);
-        } else {
-            --store->refcnt;
         }
     }
+
     fin:
     *buf = ZERO;
 }
@@ -384,7 +408,7 @@ buffet_list_free (Buffet *list, int cnt)
 {
     Buffet *elt = list;
     while(cnt--) {
-        buffet_free(elt++); //useless if split-view
+        buffet_free(elt++);
     }
     free(list);
 }
@@ -393,7 +417,7 @@ buffet_list_free (Buffet *list, int cnt)
 Buffet 
 buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen)
 {
-    // opt: local if small; no alloc if too big
+    // opt: local if small; none if too big
     size_t *lengths = malloc(cnt*sizeof(*lengths));
     size_t totlen = 0;
 
@@ -432,33 +456,37 @@ const char*
 buffet_cstr (const Buffet *buf, bool *mustfree) 
 {
     const char *data = getdata(buf);
-    *mustfree = false;
+    char *ret = (char*)data;
+    bool tofree = false;
 
     switch(TAG(buf)) {
         
         case SSO:
         case OWN:
-            return data;
-        
+            break;
+
         case VUE:
         case REF: {
             const size_t len = buf->ptr.len;
-            char* ret = malloc(len+1);
+            
+            // already a proper `len` length C string
+            if (data[len]==0) break;                
+
+            ret = malloc(len+1);
 
             if (!ret) {
-                ERR("failed allocation"); 
-                *mustfree = true;
-                return calloc(1,1);
+                ERR("buffet_cstr: failed allocation"); 
+                ret = calloc(1,1); // == "\0"
+            } else {
+                memcpy (ret, data, len);
+                ret[len] = 0;
             }
-            
-            memcpy (ret, data, len);
-            ret[len] = 0;
-            *mustfree = true;
-            return ret;
+            tofree = true;
         }
     }
 
-    return NULL;
+    *mustfree = tofree;
+    return ret;
 }
 
 
@@ -501,15 +529,6 @@ buffet_print (const Buffet *buf) {
 }
 
 void 
-buffet_debug (const Buffet* buf) 
-{
-    char tag[5];
-    print_type(buf, tag);
-    bool mustfree;
-    const char *cstr = buffet_cstr(buf, &mustfree);
-
-    printf ("tag:%s cap:%zu len:%zu data:'%s' cstr:'%s'\n", 
-    tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf), cstr);
-
-    if (mustfree) free((char*)cstr);
+buffet_debug (const Buffet* buf) {
+    dbg(buf);
 }
