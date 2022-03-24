@@ -47,7 +47,7 @@ The *tag* field sets how a Buffet is interpreted :
 - `SSO` : as a char array
 - `OWN` : as owning heap-allocated data (with *aux* as capacity)
 - `REF` : as a slice of owned data (with *aux* as offset)
-- `VUE` : as a slice of other data (with *aux* as offset)
+- `VUE` : as a slice of other data
 
 Any *proper* data (*SSO*/*OWN*) is null-terminated.  
 
@@ -180,7 +180,7 @@ You get a window into *src* without copy or allocation.
 Internally the return is either 
 - a *REF* to *src* if *src* is *OWN*
 - a *REF* to *src*'s target if *src* is *REF*
-- a *VUE* on *src*'s' data if *src* is *SSO* or *VUE*
+- a *VUE* on *src*'s data if *src* is *SSO* or *VUE*
 
 If the return is a *REF*, the targetted owner cannot be released before either  
 - the return is released
