@@ -2,23 +2,24 @@
 
 *All-inclusive Buffer for C*  
 
-:orange_book: [**API**](#API)    ![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
+[**API**](#API)  
+![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
 
 ![schema](assets/buffet.png)  
 
-*Buffet* is a polymorphic string buffer type featuring :
-- **SSO** (small string optimization) : short data stored inline
+*Buffet* is a polymorphic string buffer type featuring
+- automated allocations
+- **SSO** (small string optimization)
 - **views** : no-cost references to slices of data  
-- **reference counting** : secure release of views and owned data
+- **refcount** : secure release of owned data
 - **cstr** : obtain a null-terminated C string
-- automated (re)allocations
 
 In mere register-fitting **16 bytes**.  
 
 
-:construction: Caveat : still experimental  
+:construction: Experimental  
 \- not yet stable, optimized or feature-complete  
-\- not yet unit-tested for *all* paths and corner-cases  
+\- not yet 100% unit-tested  
 \- probably not thread-safe  
 
 ---
@@ -28,25 +29,25 @@ In mere register-fitting **16 bytes**.
 ```C
 union Buffet {
         
-    // OWN, REF, VUE
+    // tag = {OWN|REF|VUE}
     struct {
         char*    data
         uint32_t len
         uint32_t aux:30, tag:2 // aux = {cap|off}
     } ptr
 
-    // SSO
+    // tag = SSO
     struct {
         char     data[15]
         uint8_t  len:6, tag:2
     } sso
 }
 ```  
-The tag sets how a Buffet is interpreted :
+The *tag* field sets how a Buffet is interpreted :
 - `SSO` : as a char array
-- `OWN` : as owning heap-allocated data (with `aux` as capacity)
-- `REF` : as a slice of owned data (with `aux` as offset)
-- `VUE` : as a slice of other data (with `aux` as offset)
+- `OWN` : as owning heap-allocated data (with *aux* as capacity)
+- `REF` : as a slice of owned data (with *aux* as offset)
+- `VUE` : as a slice of other data (with *aux* as offset)
 
 Any *proper* data (*SSO*/*OWN*) is null-terminated.  
 
@@ -122,7 +123,7 @@ brain
 ```C
 void buffet_new (Buffet *dst, size_t cap)
 ```
-Create a Buffet of capacity at least `cap`.  
+Create Buffet *dst* of capacity at least *cap*.  
 
 ```C
 Buffet buf;
@@ -135,7 +136,7 @@ buffet_debug(&buf);
 ```C
 void buffet_strcopy (Buffet *dst, const char *src, size_t len)
 ```
-Create new Buffet `dst` importing `len` bytes from string `src`.  
+Copy *len* bytes from string *src* into new Buffet *dst*.  
 
 ```C
 Buffet copy;
@@ -149,8 +150,8 @@ buffet_debug(&copy);
 ```C
 void buffet_strview (Buffet *dst, const char *src, size_t len)
 ```
-Create new Buffet `dst` viewing `len` bytes from string `src`.  
-You get a window into `src`. No copy or allocation.
+View *len* bytes from string *src* into new Buffet *dst*.  
+You get a window into *src* without copy or allocation.
 
 ```C
 char src[] = "Eat Buffet!";
@@ -166,20 +167,22 @@ buffet_print(&view);
 ```C
 Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new Buffet importing `len` bytes from Buffet `src`, starting at offset `off`.  
+Copy *len* bytes of Buffet *src*, starting at offset *off*.  
 
 
 ### buffet_view
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Create new Buffet viewing `len` bytes from Buffet `src`, starting at offset `off`.  
-The return is internally either 
-- a *REF* if `src` is *OWN*
-- a *REF* to origin if `src` is *REF*
-- a *VUE* on `src` data if `src` is *SSO* or *VUE*
+View *len* bytes of Buffet *src*, starting at offset *off*.  
+You get a window into *src* without copy or allocation.  
 
-If a *REF* is returned, `src` now cannot be released before either  
+Internally the return is either 
+- a *REF* to *src* if *src* is *OWN*
+- a *REF* to *src*'s target if *src* is *REF*
+- a *VUE* on *src*'s' data if *src* is *SSO* or *VUE*
+
+If the return is a *REF*, the targetted owner cannot be released before either  
 - the return is released
 - the return is detached as owner, e.g. when you `append` to it.
 
@@ -188,30 +191,28 @@ If a *REF* is returned, `src` now cannot be released before either
 Buffet own;
 buffet_strcopy(&own, "Bonjour monsieur", 16);
 Buffet ref1 = buffet_view(&own, 0, 7);
-buffet_debug(&ref1); // tag:REF len:7 cstr:'Bonjour'
+buffet_debug(&ref1); // tag:REF cstr:'Bonjour'
 
 // view ref
 Buffet ref2 = buffet_view(&ref1, 0, 3);
-buffet_debug(&ref2); // tag:REF len:3 cstr:'Bon'
+buffet_debug(&ref2); // tag:REF cstr:'Bon'
 
 // detach views
-buffet_append(&ref2, "net", 3);
-buffet_debug(&ref2); // tag:SSO len:6 cstr:'Bonnet'
-buffet_append(&ref1, "!", 1);
-buffet_debug(&ref1); // tag:SSO len:8 cstr:'Bonjour!'
-buffet_free(&own);   // OK
+buffet_append(&ref1, "!", 1);   // "Bonjour!"
+buffet_append(&ref2, "net", 3); // "Bonnet"
+buffet_free(&own); // OK
 
 // view vue
 Buffet vue;
-buffet_strview(&vue, "Good day", 4);
+buffet_strview(&vue, "Good day", 4); // "Good"
 Buffet vue2 = buffet_view(&vue, 0, 3);
-buffet_debug(&vue2); // tag:VUE len:3 cstr:'Goo'
+buffet_debug(&vue2); // tag:VUE cstr:'Goo'
 
 // view sso
 Buffet sso;
 buffet_strcopy(&sso, "Bonjour", 7);
 Buffet vue3 = buffet_view(&sso, 0, 3);
-buffet_debug(&vue3); // tag:VUE len:3 cstr:'Bon'
+buffet_debug(&vue3); // tag:VUE cstr:'Bon'
 ```
 
 
@@ -219,11 +220,11 @@ buffet_debug(&vue3); // tag:VUE len:3 cstr:'Bon'
 ```C
 void buffet_free (Buffet *buf)
 ```
-If `buf` is *SSO* or *VUE*, it is simply zeroed, making it an empty *SSO*.  
-If `buf` is *REF*, the refcount is decremented and *buf* zeroed.  
-If `buf` owns data :  
-- with no references, the data is released and *buf* is zeroed
-- with live references, *buf* is marked for release and waits for its last ref to be released.  
+In any case, *buf* is zeroed, making it an empty *SSO*.  
+- If *buf* is *SSO* or *VUE*, it is simply zeroed.  
+- If *buf* is *REF*, the refcount is decremented. If it reaches 0, the data is released
+- If *buf* is *OWN* without references, the data is released
+- If *buf* is *OWN* with references, it's marked for release and waits for the last reference.  
 
 
 ```C
@@ -255,9 +256,9 @@ buffet_debug(&own);
 ```C
 size_t buffet_append (Buffet *dst, const char *src, size_t len)
 ```
-Appends `len` bytes from `src` to `dst`.  
+Appends *len* bytes from *src* to *dst*.  
 Returns new length or 0 on error.
-If over capacity, `dst` gets reallocated. 
+If over capacity, *dst* gets reallocated. 
 
 ```C
 Buffet buf;
@@ -273,7 +274,7 @@ buffet_debug(&buf);
 Buffet* buffet_splitstr (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 ```
-Splits `src` along separator `sep` into a Buffet list of resulting length `*outcnt`.  
+Splits *src* along separator *sep* into a Buffet list of resulting length `*outcnt`.  
 The list can be freed using `buffet_list_free(list, cnt)`
 
 ```C
@@ -292,7 +293,7 @@ buffet_list_free(parts, cnt);
 ```C
 Buffet buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen);
 ```
-Joins `list` on separator `sep` into a new Buffet.  
+Joins *list* on separator *sep* into a new Buffet.  
 
 ```C
 int cnt;
