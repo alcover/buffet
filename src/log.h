@@ -1,7 +1,7 @@
 #ifndef LOG_H
 #define LOG_H
 
-	#define LOG(s) do{ printf("%s\n", s); fflush(stdout);} while(0)
+	#define LOG(args...) do{ printf(args); printf("\n"); fflush(stdout);} while(0)
 	#define ERR(args...) do{fprintf(stderr,args); printf("\n");} while(0);
 
 	#define LOGS(s,msg) do{ printf("%s : '%s'\n", msg, s); 		fflush(stdout); } while(0)
