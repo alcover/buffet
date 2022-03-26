@@ -10,10 +10,12 @@ lib =		bin/buffet
 asm =		bin/buffet.asm
 check =		bin/check
 benchcpp =	bin/benchcpp
+benchbook =	bin/benchbook
+benchbookcpp =	bin/benchbookcpp
 example =	bin/example
 try =		bin/try
 
-all: $(lib) $(check) $(example)
+all: $(lib) $(check) $(example) #$(benchcpp) #$(benchbook) #$(benchbookcpp)
 	
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -27,6 +29,16 @@ $(check): src/check.c $(lib)
 	@ echo make $@
 	@ $(CP) -Og $^ -o $@
 	@ ./$@
+
+# requires libbenchmark-dev 
+$(benchcpp): src/bench.cpp $(lib)
+	@ echo make $@
+	@ g++ -std=c++2a $(OPTIM) -w -fpermissive -lbenchmark -lpthread $^ -o $@
+
+$(benchbook): src/benchbook.cpp $(lib)
+	@ echo make $@
+	@ g++ $(OPTIM) $^ -o $@
+
 
 $(example): src/example.c $(lib)
 	@ echo make $@

@@ -96,7 +96,7 @@ new_store (size_t cap)
     *store = (Store){
         .refcnt = 0,
         .canary = CANARY,
-        .data = {'\0'}
+        .data = {0}
     };
 
     store->data[cap] = 0;
