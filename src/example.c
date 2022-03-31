@@ -3,28 +3,21 @@
 
 int main()
 {
-	char text[] = "The train is fast";
+	char text[] = "The train goes";
 	
 	Buffet vue;
-	buffet_strview (&vue, text+4, 5);
-	buffet_print(&vue);
+	buffet_memview (&vue, text+4, 5);
+	buffet_print(&vue); // "train"
 
 	text[4] = 'b';
-	buffet_print(&vue);
+	buffet_print(&vue); // "brain"
 
 	Buffet ref = buffet_view (&vue, 1, 4);
-	buffet_print(&ref);
+	buffet_print(&ref); // "rain"
 
-	char wet[] = " is wet";
-	buffet_append (&ref, wet, sizeof(wet));
-	buffet_print(&ref);
+	char tail[] = "ing";
+	buffet_append (&ref, tail, sizeof(tail));
+	buffet_print(&ref); // "raining"
 
 	return 0;
 }
-
-/* prints :
-train
-brain
-rain
-rain is wet
-*/

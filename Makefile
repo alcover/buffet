@@ -2,6 +2,7 @@ CC = gcc
 OPTIM = -Og
 WARN = -Wall -Wextra
 CP = $(CC) -std=c11 $(WARN) -g
+CPP = g++ -std=c++17 $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin)
@@ -9,17 +10,17 @@ $(shell mkdir -p bin)
 lib =		bin/buffet
 asm =		bin/buffet.asm
 check =		bin/check
-benchcpp =	bin/benchcpp
-benchbook =	bin/benchbook
-benchbookcpp =	bin/benchbookcpp
+bench =		bin/bench
+utilcpp = 	bin/utilcpp
 example =	bin/example
+examples =	bin/examples
 try =		bin/try
 
-all: $(lib) $(check) $(example) #$(benchcpp) #$(benchbook) #$(benchbookcpp)
+all: $(lib) $(check) $(bench) $(example) $(examples)
 	
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
-	$(CP) $(OPTIM) -c $< -o $@
+	@ $(CP) $(OPTIM) -c $< -o $@
 
 $(asm): $(lib)
 	@ echo make $@
@@ -30,31 +31,26 @@ $(check): src/check.c $(lib)
 	@ $(CP) -Og $^ -o $@
 	@ ./$@
 
-# requires libbenchmark-dev 
-$(benchcpp): src/bench.cpp $(lib)
+# requires libbenchmark-dev
+$(bench): src/bench.cpp $(lib) $(utilcpp)
 	@ echo make $@
-	@ g++ -std=c++2a $(OPTIM) -w -fpermissive -lbenchmark -lpthread $^ -o $@
+	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
 
-$(benchbook): src/benchbook.cpp $(lib)
+$(utilcpp): src/utilcpp.cpp src/utilcpp.h
 	@ echo make $@
-	@ g++ $(OPTIM) $^ -o $@
+	@ $(CPP) $(OPTIM) -c $< -o $@
 
-
-$(example): src/example.c $(lib)
+bin/%: src/%.c $(lib)
 	@ echo make $@
-	@ $(LINK) 
-
-$(try): src/try.c $(lib)
-	@ echo make $@
-	@ $(LINK) -Wno-unused-function -Wno-unused-variable 
+	@ $(LINK)
 
 check:
 	@ ./$(check)
 
-try: $(try)
-	@ ./$(try)
+bench: 
+	@ ./$(bench) --benchmark_color=false
 
 clean:
 	@ rm -f bin/*
 
-.PHONY: all check clean try
+.PHONY: all check bench clean try

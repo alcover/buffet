@@ -5,6 +5,8 @@
 #include "buffet.h"
 #include "log.h"
 
+#define SSOMAX (BUFFET_SIZE-2) // max inline length
+
 #define assert_int(a, b) { if ((int)(a) != (int)(b)) { \
 fprintf(stderr, "%d: %s:%d != %s:%d\n", __LINE__, #a, (int)a, #b, (int)b); \
 exit(EXIT_FAILURE);}}
@@ -31,17 +33,6 @@ static char* take (size_t off, size_t len) {
 }
 
 //=============================================================================
-void check_free (Buffet *b)
-{
-    buffet_free(b);
-
-    assert_int (buffet_len(b), 0);
-    assert_int (buffet_cap(b), BUFFET_SSO);
-    assert_str (buffet_data(b), "");
-    bool mustfree;
-    assert_str (buffet_cstr(b,&mustfree), "");
-    assert(!mustfree);
-}
 
 void check_cstr (Buffet *b, size_t off, size_t len, bool expfree)
 {
@@ -94,7 +85,7 @@ void new()
     u_new (0);
     u_new (1);
     u_new (8);
-    u_new_around (BUFFET_SSO);
+    u_new_around (SSOMAX);
     u_new_around (BUFFET_SIZE);
     u_new_around (32);
     u_new_around (64);
@@ -107,7 +98,7 @@ void new()
 void u_strcopy (size_t off, size_t len)
 {
     Buffet b;
-    buffet_strcopy (&b, alpha+off, len);
+    buffet_memcopy (&b, alpha+off, len);
 
     assert_int (buffet_len(&b), len);
     assert_strn (buffet_data(&b), alpha+off, len);
@@ -122,18 +113,18 @@ void strcopy()
     u_strcopy (0, 0); 
     u_strcopy (0, 1); 
     u_strcopy (0, 8);
-    u_strcopy (0, BUFFET_SSO-1);
-    u_strcopy (0, BUFFET_SSO);
-    u_strcopy (0, BUFFET_SSO+1);
+    u_strcopy (0, SSOMAX-1);
+    u_strcopy (0, SSOMAX);
+    u_strcopy (0, SSOMAX+1);
     u_strcopy (0, 20);
     u_strcopy (0, 40);
 
     u_strcopy (8, 0); 
     u_strcopy (8, 1); 
     u_strcopy (8, 8);
-    u_strcopy (8, BUFFET_SSO-1);
-    u_strcopy (8, BUFFET_SSO);
-    u_strcopy (8, BUFFET_SSO+1);
+    u_strcopy (8, SSOMAX-1);
+    u_strcopy (8, SSOMAX);
+    u_strcopy (8, SSOMAX+1);
     u_strcopy (8, 20);
     u_strcopy (8, 40);
 }
@@ -142,7 +133,7 @@ void strcopy()
 void u_strview (size_t off, size_t len)
 {
     Buffet b;
-    buffet_strview (&b, alpha+off, len);
+    buffet_memview (&b, alpha+off, len);
 
     assert_int (buffet_len(&b), len);
     assert_strn (buffet_data(&b), alpha+off, len);
@@ -157,18 +148,18 @@ void strview()
     u_strview (0, 0); 
     u_strview (0, 1); 
     u_strview (0, 8);
-    u_strview (0, BUFFET_SSO-1);
-    u_strview (0, BUFFET_SSO);
-    u_strview (0, BUFFET_SSO+1);
+    u_strview (0, SSOMAX-1);
+    u_strview (0, SSOMAX);
+    u_strview (0, SSOMAX+1);
     u_strview (0, 20);
     u_strview (0, 40);
 
     u_strview (8, 0); 
     u_strview (8, 1); 
     u_strview (8, 8);
-    u_strview (8, BUFFET_SSO-1);
-    u_strview (8, BUFFET_SSO);
-    u_strview (8, BUFFET_SSO+1);
+    u_strview (8, SSOMAX-1);
+    u_strview (8, SSOMAX);
+    u_strview (8, SSOMAX+1);
     u_strview (8, 20);
     u_strview (8, 40);
 }
@@ -177,7 +168,7 @@ void strview()
 void u_copy (size_t off, size_t len)
 {
     Buffet src;
-    buffet_strcopy (&src, alpha, alphalen);
+    buffet_memcopy (&src, alpha, alphalen);
     Buffet b = buffet_copy(&src, off, len);
 
     assert_int (buffet_len(&b), len);
@@ -194,18 +185,18 @@ void copy()
     u_copy (0, 0); 
     u_copy (0, 1); 
     u_copy (0, 8);
-    u_copy (0, BUFFET_SSO-1);
-    u_copy (0, BUFFET_SSO);
-    u_copy (0, BUFFET_SSO+1);
+    u_copy (0, SSOMAX-1);
+    u_copy (0, SSOMAX);
+    u_copy (0, SSOMAX+1);
     u_copy (0, 20);
     u_copy (0, 40);
 
     u_copy (8, 0); 
     u_copy (8, 1); 
     u_copy (8, 8);
-    u_copy (8, BUFFET_SSO-1);
-    u_copy (8, BUFFET_SSO);
-    u_copy (8, BUFFET_SSO+1);
+    u_copy (8, SSOMAX-1);
+    u_copy (8, SSOMAX);
+    u_copy (8, SSOMAX+1);
     u_copy (8, 20);
     u_copy (8, 40);
     u_copy (0, alphalen);
@@ -216,7 +207,7 @@ void copy()
 void u_view (size_t srclen, size_t off, size_t len, bool mustfree)
 {
     Buffet src;
-    buffet_strcopy (&src, alpha, srclen);
+    buffet_memcopy (&src, alpha, srclen);
     Buffet view = buffet_view (&src, off, len);
 
     assert_int (buffet_len(&view), len);
@@ -231,7 +222,7 @@ void u_view (size_t srclen, size_t off, size_t len, bool mustfree)
 void u_view_ref (size_t srclen, size_t off, size_t len, bool mustfree)
 {
     Buffet b;
-    buffet_strcopy (&b, alpha, alphalen);
+    buffet_memcopy (&b, alpha, alphalen);
     Buffet src = buffet_view (&b, 0, srclen);
     Buffet view = buffet_view (&src, off, len);
 
@@ -248,7 +239,7 @@ void u_view_ref (size_t srclen, size_t off, size_t len, bool mustfree)
 void u_view_vue (size_t off, size_t len)
 {
     Buffet vue;
-    buffet_strview (&vue, alpha, alphalen);
+    buffet_memview (&vue, alpha, alphalen);
     Buffet view = buffet_view (&vue, off, len);
 
     assert_int (buffet_len(&view), len);
@@ -307,7 +298,7 @@ void u_append_strcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
-    buffet_strcopy (&b, alpha, initlen); 
+    buffet_memcopy (&b, alpha, initlen); 
     buffet_append (&b, alpha+initlen, len); 
 
     assert_int (buffet_len(&b), totlen);
@@ -322,7 +313,7 @@ void u_append_strview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet b;
-    buffet_strview (&b, alpha, initlen);
+    buffet_memview (&b, alpha, initlen);
     buffet_append (&b, alpha+initlen, len);
 
     assert_int (buffet_len(&b), totlen);
@@ -337,7 +328,7 @@ void u_append_view (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet src;
-    buffet_strcopy (&src, alpha, initlen);
+    buffet_memcopy (&src, alpha, initlen);
     Buffet ref = buffet_view (&src, 0, initlen);
     buffet_append (&ref, alpha+initlen, len);
 
@@ -385,41 +376,14 @@ void append()
     u_append_view (20, 20);
 }
 
-//=============================================================================
-void usplit (const char* str, const char* sep, int expc, const char* exps[])
-{
-    int cnt = 0;
-    Buffet *parts = buffet_splitstr(str, strlen(str), sep, strlen(sep), &cnt);
-
-    assert_int(cnt,expc);
-
-    for (int i=0; i<cnt; i++) {
-        Buffet *part = parts+i;
-        const char* exp = exps[i];
-        size_t explen = strlen(exp);
-
-        assert_int (buffet_len(part), explen);
-        assert_strn (buffet_data(part), exp, explen);
-    }
-
-    buffet_list_free(parts, cnt);
-}
-
-// merged with join tests
-void split()
-{
-    usplit ("a,b", ",", 2, (const char*[]){"a","b"});
-}
-
-
 //==============================================================================
 
-#define u_joinback(src, sep) \
+#define usplitjoin(src, sep) \
 { \
     size_t srclen = strlen(src);\
     size_t seplen = strlen(sep);\
     int cnt; \
-    Buffet* parts = buffet_splitstr (src, srclen, sep, seplen, &cnt); \
+    Buffet* parts = buffet_split (src, srclen, sep, seplen, &cnt); \
     Buffet joined = buffet_join (parts, cnt, sep, seplen); \
     assert_str (buffet_data(&joined), src); \
     assert_int (buffet_len(&joined), srclen); \
@@ -427,85 +391,107 @@ void split()
     buffet_free(&joined);\
 }
 
-void join() 
+void splitjoin() 
 { 
-    u_joinback ("", "|");
-    u_joinback ("|", "|");
-    u_joinback ("a", "|");
-    u_joinback ("a|", "|"); 
-    u_joinback ("a|b", "|"); 
-    u_joinback ("a|b|", "|"); 
-    u_joinback ("|a", "|");
-    u_joinback ("|a|", "|"); 
-    u_joinback ("|a|b", "|"); 
-    u_joinback ("|a|b|", "|"); 
-    u_joinback ("a||", "|"); 
-    u_joinback ("a||b", "|"); 
-    u_joinback ("a||b||", "|"); 
-    u_joinback ("||a", "|");
-    u_joinback ("||a||", "|"); 
-    u_joinback ("||a||b", "|"); 
-    u_joinback ("||a||b||", "|"); 
+    usplitjoin ("", "|");
+    usplitjoin ("|", "|");
+    usplitjoin ("a", "|");
+    usplitjoin ("a|", "|"); 
+    usplitjoin ("a|b", "|"); 
+    usplitjoin ("a|b|", "|"); 
+    usplitjoin ("|a", "|");
+    usplitjoin ("|a|", "|"); 
+    usplitjoin ("|a|b", "|"); 
+    usplitjoin ("|a|b|", "|"); 
+    usplitjoin ("a||", "|"); 
+    usplitjoin ("a||b", "|"); 
+    usplitjoin ("a||b||", "|"); 
+    usplitjoin ("||a", "|");
+    usplitjoin ("||a||", "|"); 
+    usplitjoin ("||a||b", "|"); 
+    usplitjoin ("||a||b||", "|"); 
     
-    u_joinback ("abc", "|"); 
-    u_joinback ("abc|", "|"); 
-    u_joinback ("abc|def", "|"); 
-    u_joinback ("abc|def|", "|"); 
-    u_joinback ("|abc", "|"); 
-    u_joinback ("|abc|", "|"); 
-    u_joinback ("|abc|def", "|"); 
-    u_joinback ("|abc|def|", "|"); 
-    u_joinback ("abc||", "|"); 
-    u_joinback ("abc||def", "|"); 
-    u_joinback ("abc||def||", "|"); 
-    u_joinback ("||abc", "|"); 
-    u_joinback ("||abc||", "|"); 
-    u_joinback ("||abc||def", "|"); 
-    u_joinback ("||abc||def||", "|"); 
+    usplitjoin ("abc", "|"); 
+    usplitjoin ("abc|", "|"); 
+    usplitjoin ("abc|def", "|"); 
+    usplitjoin ("abc|def|", "|"); 
+    usplitjoin ("|abc", "|"); 
+    usplitjoin ("|abc|", "|"); 
+    usplitjoin ("|abc|def", "|"); 
+    usplitjoin ("|abc|def|", "|"); 
+    usplitjoin ("abc||", "|"); 
+    usplitjoin ("abc||def", "|"); 
+    usplitjoin ("abc||def||", "|"); 
+    usplitjoin ("||abc", "|"); 
+    usplitjoin ("||abc||", "|"); 
+    usplitjoin ("||abc||def", "|"); 
+    usplitjoin ("||abc||def||", "|"); 
 }
 
 //=============================================================================
+
+void check_free (Buffet *b, bool expfree)
+{
+    bool rc = buffet_free(b);
+
+    assert_int (rc, expfree);
+    assert_int (buffet_len(b), 0);
+    // assert_int (buffet_cap(b), SSOMAX);
+    assert_str (buffet_data(b), "");
+
+    bool mustfree;
+    assert_str (buffet_cstr(b,&mustfree), "");
+    assert(!mustfree);
+}
+
 void free_()
 {
     {
         Buffet b; 
         buffet_new (&b, 10); 
-        check_free(&b);
+        check_free(&b, true);
     }
     {
         Buffet b; 
-        buffet_strcopy (&b, alpha, 10); 
-        check_free(&b);
+        buffet_memcopy (&b, alpha, 10); 
+        check_free(&b, true);
     }
     {
         Buffet b; 
-        buffet_strcopy (&b, alpha, 40); 
-        check_free(&b);
+        buffet_memcopy (&b, alpha, 40); 
+        check_free(&b, true);
     }
     {
         Buffet b; 
-        buffet_strview (&b, alpha, 10); 
-        check_free(&b);
+        buffet_memview (&b, alpha, 10); 
+        check_free(&b, true);
     }
     {
         Buffet own;
-        buffet_strcopy (&own, alpha, 40);
+        buffet_memcopy (&own, alpha, 40);
         Buffet ref = buffet_view (&own, 10, 4); 
-        check_free(&ref);
+        check_free(&ref, true);
         buffet_free(&own);
     }
     {
         Buffet own;
-        buffet_strcopy (&own, alpha, 40);
+        buffet_memcopy (&own, alpha, 40);
         Buffet cpy = buffet_copy (&own, 10, 4); 
-        check_free(&cpy);
+        check_free(&cpy, true);
         buffet_free(&own);
     }
     {   // double free
         Buffet b; 
-        buffet_strcopy (&b, alpha, 40); 
-        check_free(&b);
-        check_free(&b);
+        buffet_memcopy (&b, alpha, 40); 
+        check_free(&b, true);
+        check_free(&b, true);
+    }
+    {   // aliasing
+        Buffet b; 
+        buffet_memcopy (&b, alpha, 40); 
+        Buffet alias = b;
+        buffet_free(&b);
+        assert(buffet_free(&alias) == false);
     }
 }
 
@@ -513,18 +499,15 @@ void free_()
 
 int main()
 {
-    printf ("unit tests... ");    
-
+    LOG("unit tests... ");    
     new();
     strcopy();
     strview();
     copy();
     view();
     append();
-    split();
-    join();
+    splitjoin();
     free_();
-
-    printf ("OK\n");
+    LOG("OK");
     return 0;
 }

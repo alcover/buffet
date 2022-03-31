@@ -1,19 +1,6 @@
 /*
 Buffet - All-inclusive Buffer for C
 Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
-
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
-
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
-
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
 */
 
 #ifndef BUFFET_H
@@ -24,8 +11,8 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
 #include <stdbool.h>
 
 #define BUFFET_SIZE 16
-#define BUFFET_SSO (BUFFET_SIZE-2) // max inline length
-#define BUFFET_TAG 2 // flag bits
+#define BUFFET_TAG 2 // bits
+#define BUFFET_STACK_MEM 1024
 
 typedef union Buffet {
         
@@ -52,15 +39,16 @@ extern "C" {
 #endif
 
 void    buffet_new (Buffet *dst, size_t cap);
-void    buffet_strcopy (Buffet *dst, const char *src, size_t len);
-void    buffet_strview (Buffet *dst, const char *src, size_t len);
+void    buffet_memcopy (Buffet *dst, const char *src, size_t len);
+void    buffet_memview (Buffet *dst, const char *src, size_t len);
 Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
 Buffet  buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
 size_t  buffet_append (Buffet *dst, const char *src, size_t len);
-Buffet* buffet_splitstr (const char* src, size_t srclen,
+Buffet* buffet_split (const char* src, size_t srclen,
                       const char* sep, size_t seplen, int *outcnt);
+Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
 Buffet  buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen);
-void    buffet_free (Buffet *buf);
+bool    buffet_free (Buffet *buf);
 void    buffet_list_free (Buffet *list, int cnt);
 
 size_t  buffet_cap (const Buffet *buf);

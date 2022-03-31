@@ -25,9 +25,12 @@ typedef struct {
     char     data[1];
 } Store;
 
+#define SSOMAX (BUFFET_SIZE-2)
+#define BUFFET_LIST_LOCAL_MAX (BUFFET_STACK_MEM/sizeof(Buffet))
 #define CANARY 0xAAAAAAAA
 #define OVERALLOC 1.6
 #define ZERO ((Buffet){.fill={0}})
+#define SENTINEL ((Buffet){.data={0}, .len=0, .aux=0, .tag=OWN})
 #define TAG(buf) ((buf)->sso.tag)
 #define STEP (1ull<<BUFFET_TAG)
 #define DATAOFF offsetof(Store,data)
@@ -48,7 +51,7 @@ static size_t
 getcap (const Buffet *buf, Tag tag) {
     return 
         tag == OWN ? (STEP * buf->ptr.aux)
-    :   tag == SSO ? BUFFET_SSO
+    :   tag == SSO ? SSOMAX
     :   0;
 }
 
@@ -65,8 +68,8 @@ dbg (const Buffet* buf)
     bool mustfree;
     const char *cstr = buffet_cstr(buf, &mustfree);
 
-    printf ("tag:%s cap:%zu len:%zu data:'%s' cstr:'%s'\n", 
-    tag, buffet_cap(buf), buffet_len(buf), buffet_data(buf), cstr);
+    printf ("tag:%s cap:%zu len:%zu cstr:'%s'\n", 
+    tag, buffet_cap(buf), buffet_len(buf), cstr);
 
     if (mustfree) free((char*)cstr);
 }
@@ -178,7 +181,7 @@ grow_own (Buffet *buf, size_t newcap)
 void
 buffet_new (Buffet *dst, size_t cap)
 {
-    if (cap <= BUFFET_SSO) {
+    if (cap <= SSOMAX) {
         *dst = ZERO;
     } else {
         new_own(dst, cap, NULL, 0);
@@ -187,9 +190,9 @@ buffet_new (Buffet *dst, size_t cap)
 
 
 void
-buffet_strcopy (Buffet *dst, const char* src, size_t len)
+buffet_memcopy (Buffet *dst, const char* src, size_t len)
 {
-    if (len <= BUFFET_SSO) {
+    if (len <= SSOMAX) {
         *dst = ZERO;
         memcpy(dst->sso.data, src, len);
         dst->sso.len = len;
@@ -200,7 +203,7 @@ buffet_strcopy (Buffet *dst, const char* src, size_t len)
 
 
 void
-buffet_strview (Buffet *dst, const char* src, size_t len)
+buffet_memview (Buffet *dst, const char* src, size_t len)
 {
     *dst = (Buffet) {
         .ptr.data = (char*)src,
@@ -218,7 +221,7 @@ buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
     }
 
     Buffet ret;
-    buffet_strcopy (&ret, getdata(src)+off, len);
+    buffet_memcopy (&ret, getdata(src)+off, len);
     return ret;
 }
 
@@ -237,7 +240,7 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
         
         case SSO:
         case VUE: {
-            buffet_strview (&ret, data + off, len); 
+            buffet_memview (&ret, data + off, len); 
         }   break;
         
         case OWN: {
@@ -261,25 +264,23 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 //   Buf alias = owner // DANGER
 //   buf_free(owner)   // checks canary : OK. Free store, erase canary.
 //   buf_free(alias)   // (normally fatal) checks canary : BAD. Do nothing. 
-void
+bool
 buffet_free (Buffet *buf)
 {
     Tag tag = TAG(buf);
+    bool freed = false;
 
     if (tag==OWN||tag==REF) {
         
         Store *store = getstore(buf);
 
-        // LOG("read refcnt");
-        // assert(store->refcnt);
-
-        // protection #1 : e.g user aliased buf and freed it already.
+        // protection #1 : against aliasing
         if (!store->refcnt) {
             ERR("bad refcnt");
             goto fin;
         }
 
-        // protection #2 : in case #1 was defeated by overwrite
+        // protection #2 : against store overwrite
         if (store->canary != CANARY) {
             ERR("bad canary");
             goto fin;
@@ -293,8 +294,11 @@ buffet_free (Buffet *buf)
         }
     }
 
+    freed = true;
+
     fin:
     *buf = ZERO;
+    return freed;
 }
 
 
@@ -333,73 +337,77 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
     } else if (tag==REF) {
 
         Store *store = getstore(buf);
-        buffet_strcopy (buf, curdata, curlen); 
+        buffet_memcopy (buf, curdata, curlen); 
         -- store->refcnt;
         buffet_append (buf, src, srclen);
 
     } else {
 
-        buffet_strcopy (buf, curdata, curlen); 
+        buffet_memcopy (buf, curdata, curlen); 
         buffet_append (buf, src, srclen);
     }
 
     return newlen;
 }
 
-#define BUFFET_STACK_MEM 1024
-#define LIST_LOCAL_MAX (BUFFET_STACK_MEM/sizeof(Buffet))
 
 Buffet*
-buffet_splitstr (const char* src, size_t srclen, const char* sep, size_t seplen, 
+buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 {
     int curcnt = 0; 
     Buffet *ret = NULL;
     
-    Buffet  list_local[LIST_LOCAL_MAX]; 
-    Buffet *list = list_local;
+    Buffet  parts_local[BUFFET_LIST_LOCAL_MAX]; 
+    Buffet *parts = parts_local;
     bool local = true;
-    int listmax = LIST_LOCAL_MAX;
+    int partsmax = BUFFET_LIST_LOCAL_MAX;
 
     const char *beg = src;
-    const char *end = src;
+    const char *end = beg;
 
     while ((end = strstr(end, sep))) {
 
-        if (curcnt >= listmax-1) {
+        if (curcnt >= partsmax-1) {
 
-            listmax *= 2;
-            size_t newsz = listmax * sizeof(Buffet);
+            partsmax *= 2;
+            size_t newsz = partsmax * sizeof(Buffet);
 
             if (local) {
-                list = malloc(newsz); 
-                if (!list) {curcnt = 0; goto fin;}
-                memcpy (list, list_local, curcnt * sizeof(Buffet));
+                parts = malloc(newsz); 
+                if (!parts) {curcnt = 0; goto fin;}
+                memcpy (parts, parts_local, curcnt * sizeof(Buffet));
                 local = false;
             } else {
-                list = realloc(list, newsz); 
-                if (!list) {curcnt = 0; goto fin;}
+                parts = realloc(parts, newsz); 
+                if (!parts) {curcnt = 0; goto fin;}
             }
         }
 
-        buffet_strview (&list[curcnt++], beg, end-beg);
-        end += seplen;
-        beg = end;
+        buffet_memview (&parts[curcnt++], beg, end-beg);
+        beg = end+seplen;
+        end = beg;
     };
     
     // last part
-    buffet_strview (&list[curcnt++], beg, src+srclen-beg);
+    buffet_memview (&parts[curcnt++], beg, src+srclen-beg);
 
     if (local) {
         ret = malloc(curcnt * sizeof(Buffet));
-        memcpy (ret, list, curcnt * sizeof(Buffet));
+        memcpy (ret, parts, curcnt * sizeof(Buffet));
     } else {
-        ret = list;  
+        ret = parts;  
     }
 
     fin:
     *outcnt = curcnt;
     return ret;
+}
+
+
+Buffet*
+buffet_splitstr (const char* src, const char* sep, int *outcnt) {
+    return buffet_split(src, strlen(src), sep, strlen(sep), outcnt);
 }
 
 
@@ -415,14 +423,14 @@ buffet_list_free (Buffet *list, int cnt)
 
 
 Buffet 
-buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen)
+buffet_join (Buffet *parts, int cnt, const char* sep, size_t seplen)
 {
     // opt: local if small; none if too big
     size_t *lengths = malloc(cnt*sizeof(*lengths));
     size_t totlen = 0;
 
     for (int i=0; i < cnt; ++i) {
-        size_t len = getlen(&list[i]);
+        size_t len = getlen(&parts[i]);
         totlen += len;
         lengths[i] = len;
     }
@@ -434,7 +442,7 @@ buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen)
     cur[totlen] = 0; 
 
     for (int i=0; i < cnt; ++i) {
-        const char *eltdata = getdata(&list[i]);
+        const char *eltdata = getdata(&parts[i]);
         size_t eltlen = lengths[i];
         memcpy(cur, eltdata, eltlen);
         cur += eltlen;

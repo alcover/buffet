@@ -16,11 +16,10 @@
 
 In mere register-fitting **16 bytes**.  
 
-
-:construction: Experimental  
+:construction:  
 \- not yet stable, optimized or feature-complete  
 \- not yet 100% unit-tested  
-\- probably not thread-safe  
+\- not yet thread-safe  
 
 ---
 
@@ -67,23 +66,21 @@ Any *proper* data (*SSO*/*OWN*) is null-terminated.
 
 int main()
 {
-    char text[] = "The train goes.";
-
-    Buffet own;
-    buffet_strcopy (&own, text, sizeof(text));
-
-    Buffet ref = buffet_view (&own, 4, 5);
-    buffet_print(&ref); // "train"
-
-    buffet_append (&ref, "ing", 3);
-    buffet_print(&ref); // "training"
+    char text[] = "The train goes";
     
     Buffet vue;
-    buffet_strview (&vue, text+4, 5);
+    buffet_memview (&vue, text+4, 5);
     buffet_print(&vue); // "train"
 
     text[4] = 'b';
     buffet_print(&vue); // "brain"
+
+    Buffet ref = buffet_view (&vue, 1, 4);
+    buffet_print(&ref); // "rain"
+
+    char tail[] = "ing";
+    buffet_append (&ref, tail, sizeof(tail));
+    buffet_print(&ref); // "raining"
 
     return 0;
 }
@@ -92,20 +89,21 @@ int main()
 ```
 $ gcc example.c buffet -o example && ./example
 train
-training
-train
 brain
+rain
+raining
 ```
 ---
 
 # API
 
 [buffet_new](#buffet_new)  
-[buffet_strcopy](#buffet_strcopy)  
-[buffet_strview](#buffet_strview)  
+[buffet_memcopy](#buffet_memcopy)  
+[buffet_memview](#buffet_memview)  
 [buffet_copy](#buffet_copy)  
 [buffet_view](#buffet_view)  
 [buffet_append](#buffet_append)  
+[buffet_split](#buffet_split)  
 [buffet_splitstr](#buffet_splitstr)  
 [buffet_join](#buffet_join)  
 [buffet_free](#buffet_free)  
@@ -119,46 +117,48 @@ brain
 [buffet_print](#buffet_print)  
 [buffet_debug](#buffet_debug)  
 
+
+
 ### buffet_new
 ```C
 void buffet_new (Buffet *dst, size_t cap)
 ```
-Create Buffet *dst* of capacity at least *cap*.  
+Create Buffet *dst* of minimum capacity *cap*.  
 
 ```C
 Buffet buf;
 buffet_new(&buf, 20);
 buffet_debug(&buf); 
-// tag:OWN cap:32 len:0 data:''
+// tag:OWN cap:20 len:0 cstr:''
 ```
 
-### buffet_strcopy
+### buffet_memcopy
 ```C
-void buffet_strcopy (Buffet *dst, const char *src, size_t len)
+void buffet_memcopy (Buffet *dst, const char *src, size_t len)
 ```
-Copy *len* bytes from string *src* into new Buffet *dst*.  
+Copy *len* bytes from *src* into new Buffet *dst*.  
 
 ```C
 Buffet copy;
-buffet_strcopy(&copy, "Bonjour", 3);
+buffet_memcopy(&copy, "Bonjour", 3);
 buffet_debug(&copy); 
-// tag:SSO cap:14 len:3 data:'Bon'
+// tag:SSO cap:14 len:3 cstr:'Bon'
 
 ```
 
-### buffet_strview
+### buffet_memview
 ```C
-void buffet_strview (Buffet *dst, const char *src, size_t len)
+void buffet_memview (Buffet *dst, const char *src, size_t len)
 ```
-View *len* bytes from string *src* into new Buffet *dst*.  
+View *len* bytes from *src* into new Buffet *dst*.  
 You get a window into *src* without copy or allocation.
 
 ```C
 char src[] = "Eat Buffet!";
 Buffet view;
-buffet_strview(&view, src+4, 3);
+buffet_memview(&view, src+4, 3);
 buffet_debug(&view);
-// tag:VUE cap:0 len:6 data:'Buffet!'
+// tag:VUE cap:0 len:6 cstr:'Buffet'
 buffet_print(&view);
 // Buf
 ```
@@ -189,7 +189,7 @@ If the return is a *REF*, the targetted owner cannot be released before either
 ```C
 // view own
 Buffet own;
-buffet_strcopy(&own, "Bonjour monsieur", 16);
+buffet_memcopy(&own, "Bonjour monsieur", 16);
 Buffet ref1 = buffet_view(&own, 0, 7);
 buffet_debug(&ref1); // tag:REF cstr:'Bonjour'
 
@@ -204,13 +204,13 @@ buffet_free(&own); // OK
 
 // view vue
 Buffet vue;
-buffet_strview(&vue, "Good day", 4); // "Good"
+buffet_memview(&vue, "Good day", 4); // "Good"
 Buffet vue2 = buffet_view(&vue, 0, 3);
 buffet_debug(&vue2); // tag:VUE cstr:'Goo'
 
 // view sso
 Buffet sso;
-buffet_strcopy(&sso, "Bonjour", 7);
+buffet_memcopy(&sso, "Bonjour", 7);
 Buffet vue3 = buffet_view(&sso, 0, 3);
 buffet_debug(&vue3); // tag:VUE cstr:'Bon'
 ```
@@ -218,7 +218,7 @@ buffet_debug(&vue3); // tag:VUE cstr:'Bon'
 
 ### buffet_free
 ```C
-void buffet_free (Buffet *buf)
+bool buffet_free (Buffet *buf)
 ```
 In any case, *buf* is zeroed, making it an empty *SSO*.  
 - If *buf* is *SSO* or *VUE*, it is simply zeroed.  
@@ -231,23 +231,21 @@ In any case, *buf* is zeroed, making it an empty *SSO*.
 char text[] = "Le grand orchestre de Patato Valdez";
 
 Buffet own;
-buffet_strcopy(&own, text, sizeof(text));
+buffet_memcopy(&own, text, sizeof(text));
 buffet_debug(&own);
-// tag:OWN data:'Le grand orchestre de Patato Valdez'
+// tag:OWN cstr:'Le grand orchestre de Patato Valdez'
 
 Buffet ref = buffet_view(&own, 22, 13);
 buffet_debug(&ref);
-// tag:REF data:'Patato Valdez'
+// tag:REF cstr:'Patato Valdez'
 
-// Too soon but marked for release
+// Too soon but data marked for release
 buffet_free(&own);
 buffet_debug(&own);
-// tag:OWN data:'Le grand orchestre de Patato Valdez'
+// tag:SSO cstr:''
 
-// Release last ref, hence owner
+// Release last ref, so data gets released
 buffet_free(&ref);
-buffet_debug(&own);
-// tag:SSO data:''
 ```
 
 
@@ -262,31 +260,36 @@ If over capacity, *dst* gets reallocated.
 
 ```C
 Buffet buf;
-buffet_strcopy(&buf, "abc", 3); 
+buffet_memcopy(&buf, "abc", 3); 
 size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
 buffet_debug(&buf);
-// tag:SSO cap:14 len:6 data:'abcdef'
+// tag:SSO cap:14 len:6 cstr:'abcdef'
 ```
 
 
-### buffet_splitstr
+### buffet_split
 ```C
-Buffet* buffet_splitstr (const char* src, size_t srclen, const char* sep, size_t seplen, 
+Buffet* buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 ```
-Splits *src* along separator *sep* into a Buffet list of resulting length `*outcnt`.  
-The list can be freed using `buffet_list_free(list, cnt)`
+Splits *src* along separator *sep* into a Buffet list of length `*outcnt`.  
+The list can be freed using `buffet_list_free(list, outcnt)`
 
 ```C
 int cnt;
-Buffet *parts = buffet_splitstr("Split me", 8, " ", 1, &cnt);
+Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
 for (int i=0; i<cnt; ++i)
     buffet_debug(&parts[i]);
 buffet_list_free(parts, cnt);
-// tag:VUE cap:0 len:5 data:'Split me' cstr:'Split'
-// tag:VUE cap:0 len:2 data:'me' cstr:'me'
+// tag:VUE cap:0 len:5 cstr:'Split'
+// tag:VUE cap:0 len:2 cstr:'me'
 ```
 
+### buffet_splitstr
+```C
+Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
+```
+Convenient *split* using *strlen* internally.
 
 
 ### buffet_join
@@ -300,7 +303,7 @@ int cnt;
 Buffet *parts = buffet_splitstr("Split me", 8, " ", 1, &cnt);
 Buffet back = buffet_join(parts, cnt, " ", 1);
 buffet_debug(&back);
-// tag:SSO cap:14 len:8 data:'Split me' cstr:'Split me'
+// tag:SSO cap:14 len:8 cstr:'Split me'
 ```
 
 
@@ -352,7 +355,7 @@ void buffet_debug (Buffet *buf)
 
 ```C
 Buffet buf;
-buffet_strcopy(&buf, "foo", 3);
+buffet_memcopy(&buf, "foo", 3);
 buffet_debug(&buf);
-// tag:SSO cap:14 len:3 data:'foo'
+// tag:SSO cap:14 len:3 cstr:'foo'
 ```
