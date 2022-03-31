@@ -10,13 +10,13 @@ $(shell mkdir -p bin)
 lib =		bin/buffet
 asm =		bin/buffet.asm
 check =		bin/check
-bench =		bin/bench
+benchcpp =		bin/benchcpp
 utilcpp = 	bin/utilcpp
 example =	bin/example
 examples =	bin/examples
 try =		bin/try
 
-all: $(lib) $(check) $(bench) $(example) $(examples)
+all: $(lib) $(check) $(example) $(examples) #$(benchcpp)
 	
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -32,7 +32,7 @@ $(check): src/check.c $(lib)
 	@ ./$@
 
 # requires libbenchmark-dev
-$(bench): src/bench.cpp $(lib) $(utilcpp)
+$(benchcpp): src/bench.cpp $(lib) $(utilcpp)
 	@ echo make $@
 	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
 
@@ -47,10 +47,10 @@ bin/%: src/%.c $(lib)
 check:
 	@ ./$(check)
 
-bench: 
-	@ ./$(bench) --benchmark_color=false
+benchcpp: 
+	@ ./$(benchcpp) --benchmark_color=false
 
 clean:
 	@ rm -f bin/*
 
-.PHONY: all check bench clean try
+.PHONY: all check benchcpp clean try

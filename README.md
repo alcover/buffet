@@ -93,6 +93,29 @@ brain
 rain
 raining
 ```
+
+### Speed
+Not optimized yet but a basic (maybe unfair) benchmark is available :  
+build with `make && make bin/benchcpp`  
+run with `make benchcpp`
+
+Result on my weak thinkpad :  
+```
+----------------------------------------------------------
+Benchmark                   Time           CPU Iterations
+----------------------------------------------------------
+SPLIT_JOIN_CPPVIEW       5427 ns       5427 ns     127601
+SPLIT_JOIN_PLAINC        4860 ns       4859 ns     143777
+SPLIT_JOIN_BUFFET        2285 ns       2285 ns     306700
+APPEND_CPP/1              223 us        223 us       3153
+APPEND_CPP/8              331 us        331 us       2107
+APPEND_CPP/64            1291 us       1291 us        537
+APPEND_BUFFET/1           134 us        134 us       5189
+APPEND_BUFFET/8           147 us        147 us       4723
+APPEND_BUFFET/64          194 us        194 us       3610
+```
+
+
 ---
 
 # API
@@ -156,11 +179,9 @@ You get a window into *src* without copy or allocation.
 ```C
 char src[] = "Eat Buffet!";
 Buffet view;
-buffet_memview(&view, src+4, 3);
+buffet_memview(&view, src+4, 6);
 buffet_debug(&view);
 // tag:VUE cap:0 len:6 cstr:'Buffet'
-buffet_print(&view);
-// Buf
 ```
 
 ### buffet_copy
@@ -220,12 +241,9 @@ buffet_debug(&vue3); // tag:VUE cstr:'Bon'
 ```C
 bool buffet_free (Buffet *buf)
 ```
+Discards *buf*. 
+If *buf* was the last reference to owned data, the data is released.
 In any case, *buf* is zeroed, making it an empty *SSO*.  
-- If *buf* is *SSO* or *VUE*, it is simply zeroed.  
-- If *buf* is *REF*, the refcount is decremented. If it reaches 0, the data is released
-- If *buf* is *OWN* without references, the data is released
-- If *buf* is *OWN* with references, it's marked for release and waits for the last reference.  
-
 
 ```C
 char text[] = "Le grand orchestre de Patato Valdez";
