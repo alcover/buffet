@@ -95,24 +95,21 @@ raining
 ```
 
 ### Speed
-Not optimized yet but a basic (maybe unfair) benchmark is available :  
-build with `make && make bin/benchcpp`  
-run with `make benchcpp`
+Not optimized yet but a basic (maybe unfair) benchmark is available  
+`make && make bin/benchcpp`  
+`make benchcpp`
 
-Result on my weak thinkpad :  
+On my weak thinkpad :  
 ```
-----------------------------------------------------------
-Benchmark                   Time           CPU Iterations
-----------------------------------------------------------
-SPLIT_JOIN_CPPVIEW       5427 ns       5427 ns     127601
-SPLIT_JOIN_PLAINC        4860 ns       4859 ns     143777
-SPLIT_JOIN_BUFFET        2285 ns       2285 ns     306700
-APPEND_CPP/1              223 us        223 us       3153
-APPEND_CPP/8              331 us        331 us       2107
-APPEND_CPP/64            1291 us       1291 us        537
-APPEND_BUFFET/1           134 us        134 us       5189
-APPEND_BUFFET/8           147 us        147 us       4723
-APPEND_BUFFET/64          194 us        194 us       3610
+SPLIT_JOIN_CPPVIEW       5427 ns
+SPLIT_JOIN_PLAINC        4860 ns
+SPLIT_JOIN_BUFFET        2285 ns
+APPEND_CPP/1              223 us
+APPEND_CPP/8              331 us
+APPEND_CPP/64            1291 us
+APPEND_BUFFET/1           134 us
+APPEND_BUFFET/8           147 us
+APPEND_BUFFET/64          194 us
 ```
 
 
@@ -203,9 +200,9 @@ Internally the return is either
 - a *REF* to *src*'s target if *src* is *REF*
 - a *VUE* on *src*'s data if *src* is *SSO* or *VUE*
 
-If the return is a *REF*, the targetted owner cannot be released before either  
+If the return is a *REF*, the targetted data cannot be released before either  
 - the return is released
-- the return is detached as owner, e.g. when you `append` to it.
+- the return is detached, e.g. when you `append` to it.
 
 ```C
 // view own
@@ -241,8 +238,8 @@ buffet_debug(&vue3); // tag:VUE cstr:'Bon'
 ```C
 bool buffet_free (Buffet *buf)
 ```
-Discards *buf*. 
-If *buf* was the last reference to owned data, the data is released.
+Discards *buf*.  
+If *buf* was the last reference to owned data, the data is released.  
 In any case, *buf* is zeroed, making it an empty *SSO*.  
 
 ```C
@@ -318,7 +315,7 @@ Joins *list* on separator *sep* into a new Buffet.
 
 ```C
 int cnt;
-Buffet *parts = buffet_splitstr("Split me", 8, " ", 1, &cnt);
+Buffet *parts = buffet_splitstr("Split me", " ", &cnt);
 Buffet back = buffet_join(parts, cnt, " ", 1);
 buffet_debug(&back);
 // tag:SSO cap:14 len:8 cstr:'Split me'
