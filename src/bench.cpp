@@ -6,9 +6,8 @@ extern "C" {
 	#include "util.h"
 }
 
-
 #define SPC " "
-#define SEP SPC SPC
+#define SEP SPC
 
 const char *TEXT =
 "a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
@@ -26,12 +25,15 @@ const char *TEXT =
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" SEP "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" SEP \
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" SEP "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" SEP;
 
-const size_t TEXTLEN = strlen(TEXT);
 const char *sep = SEP;
-const size_t seplen = strlen(sep);
+
+static char* repeat(size_t n) {
+    char *ret = malloc(n+1);
+    memset(ret,'A',n); ret[n] = 0;
+    return ret;
+} 
 
 //=============================================================================
-
 static void 
 SPLIT_JOIN_CPPVIEW (benchmark::State& state) 
 {
@@ -40,7 +42,6 @@ SPLIT_JOIN_CPPVIEW (benchmark::State& state)
         const char* ret = join_cppview(parts, sep);
 
         assert(!strcmp(ret, TEXT));
-
         free(ret);
     }
 }
@@ -54,7 +55,6 @@ SPLIT_JOIN_PLAINC (benchmark::State& state)
         const char* ret = join(parts, cnt, sep);
 
         assert(!strcmp(ret, TEXT));
-
         free(ret);
         for (int i = 0; i < cnt; ++i) free(parts[i]);
         free(parts);
@@ -72,62 +72,27 @@ SPLIT_JOIN_BUFFET (benchmark::State& state)
         const char *ret = buffet_cstr(&back, &mustfree);
 
         assert(!strcmp(ret, TEXT));
-
         if (mustfree) free(ret);
         buffet_free(&back);
-        buffet_list_free(parts, cnt);
+        free(parts);
     }
 }
-
-static char* 
-// repeat(size_t n) {return string(n,'a').c_str();} //wtf bug?
-repeat(size_t n) {
-	char *ret = malloc(n+1);
-	memset(ret, 'A', n);
-	ret[n] = 0;
-	return ret;
-} 
-
+ 
+//=============================================================================
+#define APPEND_ITER 10000
 #define APPEND_INIT  \
 	const size_t srclen = state.range(0); \
 	const char *src = repeat(srclen); \
-	const int iter = APPEND_MAX; \
+	const int iter = APPEND_ITER; \
 	const char *exp = repeat(iter*srclen);
-
-#define APPEND_MAX 10000
-
-static void 
-APPEND_BUFFET (benchmark::State& state) 
-{
-	APPEND_INIT
-    for (auto _ : state) {
-
-    	Buffet dst;
-        buffet_new(&dst, 0);
-        for (int i=0; i<iter; ++i) {
-        	buffet_append(&dst, src, srclen);
-        }
-        const char *ret = buffet_data(&dst);
-
-        assert(!strcmp(ret, exp));
-
-        buffet_free(&dst);
-    }
-	
-	free(exp);
-	free(src);
-}
 
 static void 
 APPEND_CPP (benchmark::State& state) 
 {
 	APPEND_INIT
     for (auto _ : state) {
-
     	string dst;
-        for (int i=0; i<iter; ++i) {
-        	dst += src;
-        }
+        for (int i=0; i<iter; ++i) dst += src;
         const char *ret = dst.data();
 
         assert(!strcmp(ret, exp));
@@ -136,6 +101,25 @@ APPEND_CPP (benchmark::State& state)
 	free(exp);
 	free(src);
 }
+
+static void 
+APPEND_BUFFET (benchmark::State& state) 
+{
+	APPEND_INIT
+    for (auto _ : state) {
+    	Buffet dst;
+        buffet_new(&dst, 0);
+        for (int i=0; i<iter; ++i) buffet_append(&dst, src, srclen);
+        const char *ret = buffet_data(&dst);
+
+        assert(!strcmp(ret, exp));
+        buffet_free(&dst);
+    }
+	
+	free(exp);
+	free(src);
+}
+
 //=====================================================================
 
 #define BEG 1

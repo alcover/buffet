@@ -7,19 +7,15 @@
 
 ![schema](assets/buffet.png)  
 
-*Buffet* is a polymorphic string buffer type featuring
-- automated allocations
+Buffet is a polymorphic string buffer with
 - **SSO** (small string optimization)
 - **views** : no-cost references to slices of data  
 - **refcount** : secure release of owned data
-- **cstr** : obtain a null-terminated C string
+- 4GB max length
 
-In mere register-fitting **16 bytes**.  
+Buffet is compact (**16 bytes**), [**fast**](#Speed) and [**secure**](#Security).  
 
-:construction:  
-\- not yet stable, optimized or feature-complete  
-\- not yet 100% unit-tested  
-\- not yet thread-safe  
+(Coming: thread safety)
 
 ---
 
@@ -42,7 +38,7 @@ union Buffet {
     } sso
 }
 ```  
-The *tag* field sets how a Buffet is interpreted :
+The *tag* sets how a Buffet is interpreted :
 - `SSO` : as a char array
 - `OWN` : as owning heap-allocated data (with *aux* as capacity)
 - `REF` : as a slice of owned data (with *aux* as offset)
@@ -53,15 +49,9 @@ Any *proper* data (*SSO*/*OWN*) is null-terminated.
 ![schema](assets/schema.png)
 
 
-
-### Build & unit-test
-
-`make && make check`
-
 ### example
 
 ```C
-#include <stdio.h>
 #include "buffet.h"
 
 int main()
@@ -94,24 +84,71 @@ rain
 raining
 ```
 
+
+### Build & unit-test
+
+`make && make check`
+
+
 ### Speed
-Not optimized yet but a basic (maybe unfair) benchmark is available  
-`make && make bin/benchcpp`  
-`make benchcpp`
 
-On my weak thinkpad :  
+`$ make && make benchcpp`  
+(requires *libbenchmark-dev*)
+
+On my weak Thinkpad :  
 ```
-SPLIT_JOIN_CPPVIEW       5427 ns
-SPLIT_JOIN_PLAINC        4860 ns
-SPLIT_JOIN_BUFFET        2285 ns
-APPEND_CPP/1              223 us
-APPEND_CPP/8              331 us
-APPEND_CPP/64            1291 us
-APPEND_BUFFET/1           134 us
-APPEND_BUFFET/8           147 us
-APPEND_BUFFET/64          194 us
+SPLIT_JOIN_CPPVIEW       3225 ns
+SPLIT_JOIN_PLAINC        2973 ns
+SPLIT_JOIN_BUFFET        1380 ns *
+APPEND_CPP/1               47 us
+APPEND_CPP/8              107 us
+APPEND_CPP/64             713 us
+APPEND_BUFFET/1            65 us *
+APPEND_BUFFET/8            78 us *
+APPEND_BUFFET/64          132 us *
 ```
 
+### Security
+
+Beyond automated bounds and allocations, Buffet prevents some memory faults.  
+
+- double-free
+
+```C
+Buffet own;
+buffet_free(&own);
+buffet_free(&own); // OK
+```
+- use-after-free
+
+```C
+Buffet own;
+buffet_free(&own);
+buffet_append(&own, foo); // OK
+```
+
+- aliasing
+
+```C
+Buffet own;
+Buffet alias = own;
+buffet_free(&own);
+buffet_free(&alias); // OK
+```
+
+
+For this, heap-stored data is preceded by a control header :
+
+```C
+struct Store {
+    refcnt
+    canary
+    data[]
+}
+```
+
+Before any sensitive operation (view, append, free), Buffet checks the *Store* header.  
+If inconsistent, the operation is aborted. 
 
 ---
 
@@ -247,22 +284,20 @@ char text[] = "Le grand orchestre de Patato Valdez";
 
 Buffet own;
 buffet_memcopy(&own, text, sizeof(text));
-buffet_debug(&own);
-// tag:OWN cstr:'Le grand orchestre de Patato Valdez'
-
-Buffet ref = buffet_view(&own, 22, 13);
-buffet_debug(&ref);
-// tag:REF cstr:'Patato Valdez'
+Buffet ref = buffet_view(&own, 22, 13); // 'Patato Valdez'
 
 // Too soon but data marked for release
 buffet_free(&own);
-buffet_debug(&own);
-// tag:SSO cstr:''
+buffet_debug(&own); // tag:SSO cstr:''
 
-// Release last ref, so data gets released
+// Was last ref, data gets actually released
 buffet_free(&ref);
 ```
 
+```
+$ valgrind  --leak-check=full ./app
+All heap blocks were freed -- no leaks are possible
+```
 
 
 ### buffet_append
@@ -287,24 +322,25 @@ buffet_debug(&buf);
 Buffet* buffet_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
     int *outcnt)
 ```
-Splits *src* along separator *sep* into a Buffet list of length `*outcnt`.  
-The list can be freed using `buffet_list_free(list, outcnt)`
+Splits *src* along separator *sep* into a Buffet Vue list of length `*outcnt`.  
 
-```C
-int cnt;
-Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
-for (int i=0; i<cnt; ++i)
-    buffet_debug(&parts[i]);
-buffet_list_free(parts, cnt);
-// tag:VUE cap:0 len:5 cstr:'Split'
-// tag:VUE cap:0 len:2 cstr:'me'
-```
+Being made of views, you can `free(list)` without leak provided no element was made an owner by e.g appending to it.
 
 ### buffet_splitstr
 ```C
 Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
 ```
 Convenient *split* using *strlen* internally.
+
+```C
+int cnt;
+Buffet *parts = buffet_splitstr("Split me", " ", &cnt);
+for (int i=0; i<cnt; ++i)
+    buffet_print(&parts[i]);
+// tag:VUE len:5 cstr:'Split'
+// tag:VUE len:2 cstr:'me'
+free(parts);
+```
 
 
 ### buffet_join
@@ -323,50 +359,48 @@ buffet_debug(&back);
 
 
 ### buffet_cap  
-Get current capacity.  
 ```C
 size_t buffet_cap (Buffet *buf)
 ```
+Get current capacity.  
 
 ### buffet_len  
-Get current length.  
 ```C
 size_t buffet_len (Buffet *buf)`
 ```
+Get current length.  
 
 ### buffet_data
-Get current data pointer.  
 ```C
 const char* buffet_data (const Buffet *buf)`
 ```
-If *buf* is a ref/view, `strlen(buffet_data)` may be longer than `buf.len`. 
+Get current data pointer.  
+To ensure null-termination at `buf.len`, use *buffet_cstr*. 
 
 ### buffet_cstr
-Get current data as a NUL-terminated **C string**.  
 ```C
 const char* buffet_cstr (const Buffet *buf, bool *mustfree)
 ```
-If *REF*/*VUE*, the slice is copied into a fresh C string that must be freed.
+Get current data as a NUL-terminated C string of length `buf.len`.  
+If needed (when *buf* is a view), the slice is copied into a fresh C string that must be freed if *mustfree* is set.
 
 ### buffet_export
- Copies data up to `buf.len` into a fresh C string that must be freed.
 ```C
 char* buffet_export (const Buffet *buf)
 ```
-
-
+ Copies data up to `buf.len` into a fresh C string that must be freed.
 
 ### buffet_print
-Prints data up to `buf.len`.
 ```C
 void buffet_print (const Buffet *buf)`
 ```
+Prints data up to `buf.len`.
 
 ### buffet_debug  
-Prints *buf* state.  
 ```C
 void buffet_debug (Buffet *buf)
 ```
+Prints *buf* state as viewed by the API.  
 
 ```C
 Buffet buf;

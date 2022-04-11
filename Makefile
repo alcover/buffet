@@ -1,42 +1,46 @@
 CC = gcc
-OPTIM = -Og
+OPTIM = -O2
 WARN = -Wall -Wextra
 CP = $(CC) -std=c11 $(WARN) -g
 CPP = g++ -std=c++17 $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin)
+OBJDUMP := $(shell objdump -v 2>/dev/null)
 
 lib =		bin/buffet
 asm =		bin/buffet.asm
 check =		bin/check
-benchcpp =		bin/benchcpp
-utilcpp = 	bin/utilcpp
+benchcpp =	bin/benchcpp
 example =	bin/example
 examples =	bin/examples
 try =		bin/try
 
-all: $(lib) $(check) $(example) $(examples) #$(benchcpp)
-	
+all: $(lib) $(asm) $(check) $(example) $(examples) $(benchcpp)
+
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
-	@ $(CP) $(OPTIM) -c $< -o $@
+	$(CP) $(OPTIM) -c $< -o $@
 
 $(asm): $(lib)
 	@ echo make $@
-	@ objdump -M intel --no-show-raw-insn -d -S $< > $@ 
+ifdef OBJDUMP
+	@ objdump -M intel --no-show-raw-insn -d $< > $@ 
+else
+	@ echo objdump not installed
+endif
 
 $(check): src/check.c $(lib)
 	@ echo make $@
-	@ $(CP) -Og $^ -o $@
+	@ $(CP) -O0 $^ -o $@
 	@ ./$@
 
 # requires libbenchmark-dev
-$(benchcpp): src/bench.cpp $(lib) $(utilcpp)
+$(benchcpp): src/bench.cpp $(lib) bin/utilcpp
 	@ echo make $@
 	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
 
-$(utilcpp): src/utilcpp.cpp src/utilcpp.h
+bin/utilcpp: src/utilcpp.cpp src/utilcpp.h
 	@ echo make $@
 	@ $(CPP) $(OPTIM) -c $< -o $@
 

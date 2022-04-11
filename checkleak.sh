@@ -4,4 +4,4 @@
 # ex: check src/example.c
 # $ ./checkleak example
 
-make && valgrind --leak-check=full ./bin/$1
+valgrind --leak-check=full ./bin/$1

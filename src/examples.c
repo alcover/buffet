@@ -1,5 +1,6 @@
 // README code examples
 
+#include <stdlib.h>
 #include "buffet.h"
 
 int main() { 
@@ -118,7 +119,7 @@ int cnt;
 Buffet *parts = buffet_split("Split me", 8, " ", 1, &cnt);
 for (int i=0; i<cnt; ++i)
     buffet_debug(&parts[i]);
-buffet_list_free(parts, cnt);
+free(parts);
 // tag:VUE cap:0 len:5 cstr:'Split'
 // tag:VUE cap:0 len:2 cstr:'me'
 }

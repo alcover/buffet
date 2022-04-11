@@ -10,9 +10,12 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stdint.h>
 #include <stdbool.h>
 
+#define BUFFET_STACK_MEM 1024
+
+// Do not touch
 #define BUFFET_SIZE 16
 #define BUFFET_TAG 2 // bits
-#define BUFFET_STACK_MEM 1024
+#define SSOMAX (BUFFET_SIZE-2)
 
 typedef union Buffet {
         
@@ -43,13 +46,14 @@ void    buffet_memcopy (Buffet *dst, const char *src, size_t len);
 void    buffet_memview (Buffet *dst, const char *src, size_t len);
 Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
 Buffet  buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
+Buffet  buffet_clone (const Buffet *src);
 size_t  buffet_append (Buffet *dst, const char *src, size_t len);
 Buffet* buffet_split (const char* src, size_t srclen,
                       const char* sep, size_t seplen, int *outcnt);
 Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
-Buffet  buffet_join (Buffet *list, int cnt, const char* sep, size_t seplen);
+Buffet  buffet_join (const Buffet *list, int cnt, 
+                     const char* sep, size_t seplen);
 bool    buffet_free (Buffet *buf);
-void    buffet_list_free (Buffet *list, int cnt);
 
 size_t  buffet_cap (const Buffet *buf);
 size_t  buffet_len (const Buffet *buf);
