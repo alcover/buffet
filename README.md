@@ -100,15 +100,16 @@ NB: No effort has yet been done on optimization.
 
 On my weak Thinkpad :  
 ```
-SPLIT_JOIN_CPPVIEW       3225 ns
-SPLIT_JOIN_PLAINC        2973 ns
-SPLIT_JOIN_BUFFET        1518 ns *
-APPEND_CPP/1               53 us
-APPEND_CPP/8              110 us
-APPEND_CPP/64             711 us
-APPEND_BUFFET/1            98 us *
-APPEND_BUFFET/8           111 us *
-APPEND_BUFFET/64          153 us *
+SPLITJOIN_cppView       3658 ns
+SPLITJOIN_plainC        3009 ns
+SPLITJOIN_buffet        1376 ns
+APPEND_cpp/1              53 us
+APPEND_cpp/8             112 us
+APPEND_cpp/64            727 us
+APPEND_buffet/1           77 us
+APPEND_buffet/8           90 us
+APPEND_buffet/64         134 us
+
 ```
 
 

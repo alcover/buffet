@@ -35,7 +35,7 @@ static char* repeat(size_t n) {
 
 //=============================================================================
 static void 
-SPLIT_JOIN_CPPVIEW (benchmark::State& state) 
+SPLITJOIN_cppView (benchmark::State& state) 
 {
     for (auto _ : state) {
         vector<string_view> parts = split_cppview(TEXT, sep);
@@ -47,7 +47,7 @@ SPLIT_JOIN_CPPVIEW (benchmark::State& state)
 }
 
 static void 
-SPLIT_JOIN_PLAINC (benchmark::State& state) 
+SPLITJOIN_plainC (benchmark::State& state) 
 {
     for (auto _ : state) {
         int cnt = 0;
@@ -62,7 +62,7 @@ SPLIT_JOIN_PLAINC (benchmark::State& state)
 }
 
 static void 
-SPLIT_JOIN_BUFFET (benchmark::State& state) 
+SPLITJOIN_buffet (benchmark::State& state) 
 {
     for (auto _ : state) {
         int cnt = 0;
@@ -87,7 +87,7 @@ SPLIT_JOIN_BUFFET (benchmark::State& state)
 	const char *exp = repeat(iter*srclen);
 
 static void 
-APPEND_CPP (benchmark::State& state) 
+APPEND_cpp (benchmark::State& state) 
 {
 	APPEND_INIT
     for (auto _ : state) {
@@ -103,7 +103,7 @@ APPEND_CPP (benchmark::State& state)
 }
 
 static void 
-APPEND_BUFFET (benchmark::State& state) 
+APPEND_buffet (benchmark::State& state) 
 {
 	APPEND_INIT
     for (auto _ : state) {
@@ -126,10 +126,10 @@ APPEND_BUFFET (benchmark::State& state)
 #define END 64
 #define MUL 8
 
-BENCHMARK(SPLIT_JOIN_CPPVIEW);
-BENCHMARK(SPLIT_JOIN_PLAINC);
-BENCHMARK(SPLIT_JOIN_BUFFET);
-BENCHMARK(APPEND_CPP)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
-BENCHMARK(APPEND_BUFFET)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
+BENCHMARK(SPLITJOIN_cppView);
+BENCHMARK(SPLITJOIN_plainC);
+BENCHMARK(SPLITJOIN_buffet);
+BENCHMARK(APPEND_cpp)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
+BENCHMARK(APPEND_buffet)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
 
 BENCHMARK_MAIN();
