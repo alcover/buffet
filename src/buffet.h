@@ -15,24 +15,22 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 // Do not touch
 #define BUFFET_SIZE 16
 #define BUFFET_TAG 2 // bits
-#define SSOMAX (BUFFET_SIZE-2)
+#define BUFFET_SSOMAX (BUFFET_SIZE-2)
 
 typedef union Buffet {
         
+    char fill[BUFFET_SIZE];
+
     struct {
         char*    data;
         uint32_t len;
-        uint32_t aux : 32-BUFFET_TAG,
-                 tag : BUFFET_TAG;
+        uint32_t aux:32-BUFFET_TAG, tag:BUFFET_TAG;
     } ptr;
 
     struct {
         char     data[BUFFET_SIZE-1];
-        uint8_t  len : 8-BUFFET_TAG,
-                 tag : BUFFET_TAG;
+        uint8_t  len:8-BUFFET_TAG, tag:BUFFET_TAG;
     } sso;
-
-    char fill[BUFFET_SIZE];
  
 } Buffet;
 
@@ -57,8 +55,10 @@ bool    buffet_free (Buffet *buf);
 
 size_t  buffet_cap (const Buffet *buf);
 size_t  buffet_len (const Buffet *buf);
-const char* buffet_data (const Buffet *buf);
-const char* buffet_cstr (const Buffet *buf, bool *mustfree);
+const char* 
+        buffet_data (const Buffet *buf);
+const char* 
+        buffet_cstr (const Buffet *buf, bool *mustfree);
 char*   buffet_export (const Buffet *buf);
 
 void    buffet_print (const Buffet *buf);

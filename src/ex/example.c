@@ -1,4 +1,4 @@
-#include "buffet.h"
+#include "../buffet.h"
 
 int main()
 {

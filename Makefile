@@ -6,17 +6,17 @@ CPP = g++ -std=c++17 $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin)
+$(shell mkdir -p bin/ex)
+
 OBJDUMP := $(shell objdump -v 2>/dev/null)
 
 lib =		bin/buffet
 asm =		bin/buffet.asm
 check =		bin/check
 benchcpp =	bin/benchcpp
-example =	bin/example
-examples =	bin/examples
-try =		bin/try
+examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) $(example) $(examples) $(benchcpp)
+all: $(lib) $(asm) $(check) $(examples) $(benchcpp)
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -44,7 +44,7 @@ bin/utilcpp: src/utilcpp.cpp src/utilcpp.h
 	@ echo make $@
 	@ $(CPP) $(OPTIM) -c $< -o $@
 
-bin/%: src/%.c $(lib)
+bin/ex/%: src/ex/%.c $(lib)
 	@ echo make $@
 	@ $(LINK)
 
@@ -57,4 +57,4 @@ benchcpp:
 clean:
 	@ rm -f bin/*
 
-.PHONY: all check benchcpp clean try
+.PHONY: all check benchcpp clean

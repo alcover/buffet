@@ -7,15 +7,14 @@
 
 ![schema](assets/buffet.png)  
 
-Buffet is a polymorphic string buffer with
+Buffet is an experimental polymorphic string buffer with
 - **SSO** (small string optimization)
-- **views** : no-cost references to slices of data  
+- **views** : no-copy references to slices of data  
 - **refcount** : secure release of owned data
-- 4GB max length
+- 4GB max length (possibly 16)
 
-Buffet is compact (**16 bytes**), [**fast**](#Speed) and [**secure**](#Security).  
-
-(Coming: thread safety)
+It is compact (**16 bytes**), reasonably [**fast**](#Speed) and aims at total [**security**](#Security).  
+Coming: thread safety
 
 ---
 
@@ -24,27 +23,27 @@ Buffet is compact (**16 bytes**), [**fast**](#Speed) and [**secure**](#Security)
 ```C
 union Buffet {
         
-    // tag = {OWN|REF|VUE}
+    // OWN|REF|VUE
     struct {
         char*    data
         uint32_t len
-        uint32_t aux:30, tag:2 // aux = {cap|off}
+        uint32_t aux:30, 2 // aux = cap|off
     } ptr
 
-    // tag = SSO
+    // SSO
     struct {
         char     data[15]
-        uint8_t  len:6, tag:2
+        uint8_t  len:6, 2
     } sso
 }
 ```  
-The *tag* sets how a Buffet is interpreted :
-- `SSO` : as a char array
-- `OWN` : as owning heap-allocated data (with *aux* as capacity)
-- `REF` : as a slice of owned data (with *aux* as offset)
-- `VUE` : as a slice of other data
+The *tag* sets how Buffet is interpreted :
+- `SSO` : as in-situ char array
+- `OWN` : as owning heap-allocated data (*aux* = capacity)
+- `REF` : as slice of owned data (*aux* = offset)
+- `VUE` : as slice of other data
 
-Any *proper* data (*SSO*/*OWN*) is null-terminated.  
+Any proper data (*SSO*/*OWN*) is null-terminated.  
 
 ![schema](assets/schema.png)
 
@@ -89,55 +88,67 @@ raining
 
 `make && make check`
 
+While extensive, tests may not yet cover *all* cases.
+
 
 ### Speed
 
 `$ make && make benchcpp`  
-(requires *libbenchmark-dev*)
+(requires *libbenchmark-dev*)  
+
+NB: No effort has yet been done on optimization.
 
 On my weak Thinkpad :  
 ```
 SPLIT_JOIN_CPPVIEW       3225 ns
 SPLIT_JOIN_PLAINC        2973 ns
-SPLIT_JOIN_BUFFET        1380 ns *
-APPEND_CPP/1               47 us
-APPEND_CPP/8              107 us
-APPEND_CPP/64             713 us
-APPEND_BUFFET/1            65 us *
-APPEND_BUFFET/8            78 us *
-APPEND_BUFFET/64          132 us *
+SPLIT_JOIN_BUFFET        1518 ns *
+APPEND_CPP/1               53 us
+APPEND_CPP/8              110 us
+APPEND_CPP/64             711 us
+APPEND_BUFFET/1            98 us *
+APPEND_BUFFET/8           111 us *
+APPEND_BUFFET/64          153 us *
 ```
+
 
 ### Security
 
-Beyond automated bounds and allocations, Buffet prevents some memory faults.  
+Buffet aims at preventing any memory fault, including from user.  
+(Except of course when a reference target goes out of scope..)  
+
+See *check.c : danger()*.  
 
 - double-free
 
 ```C
-Buffet own;
-buffet_free(&own);
-buffet_free(&own); // OK
+Buffet buf;
+// (...)
+buffet_free(&buf);
+buffet_free(&buf); // OK
 ```
 - use-after-free
 
 ```C
-Buffet own;
-buffet_free(&own);
-buffet_append(&own, foo); // OK
+Buffet buf;
+// (...)
+buffet_free(&buf);
+buffet_append(&buf, foo); // OK
 ```
 
 - aliasing
 
 ```C
-Buffet own;
-Buffet alias = own;
-buffet_free(&own);
+Buffet buf;
+// (...)
+Buffet alias = buf; // not recommended. Use buffet_clone().
+buffet_free(&buf);
 buffet_free(&alias); // OK
 ```
 
+Etc...
 
-For this, heap-stored data is preceded by a control header :
+For this, heap-stored data is controlled by a header :
 
 ```C
 struct Store {
@@ -147,8 +158,8 @@ struct Store {
 }
 ```
 
-Before any sensitive operation (view, append, free), Buffet checks the *Store* header.  
-If inconsistent, the operation is aborted. 
+On some operations like *view*, *append* or *free*, we check the Store header for a live canary and coherent refcount.  
+If either fails, the operation is aborted and the Buffet struct possibly zeroed. 
 
 ---
 
@@ -186,7 +197,7 @@ Create Buffet *dst* of minimum capacity *cap*.
 Buffet buf;
 buffet_new(&buf, 20);
 buffet_debug(&buf); 
-// tag:OWN cap:20 len:0 cstr:''
+// OWN cap:20 len:0 cstr:''
 ```
 
 ### buffet_memcopy
@@ -199,7 +210,7 @@ Copy *len* bytes from *src* into new Buffet *dst*.
 Buffet copy;
 buffet_memcopy(&copy, "Bonjour", 3);
 buffet_debug(&copy); 
-// tag:SSO cap:14 len:3 cstr:'Bon'
+// SSO cap:14 len:3 cstr:'Bon'
 
 ```
 
@@ -215,27 +226,27 @@ char src[] = "Eat Buffet!";
 Buffet view;
 buffet_memview(&view, src+4, 6);
 buffet_debug(&view);
-// tag:VUE cap:0 len:6 cstr:'Buffet'
+// VUE cap:0 len:6 cstr:'Buffet'
 ```
 
 ### buffet_copy
 ```C
 Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-Copy *len* bytes of Buffet *src*, starting at offset *off*.  
+Copy *len* bytes of Buffet *src*, starting at *off*.  
 
 
 ### buffet_view
 ```C
 Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
 ```
-View *len* bytes of Buffet *src*, starting at offset *off*.  
+View *len* bytes of Buffet *src*, starting at *off*.  
 You get a window into *src* without copy or allocation.  
 
 Internally the return is either 
-- a *REF* to *src* if *src* is *OWN*
+- a *REF* to *src* if *src* is *OWN* or *SSO*
 - a *REF* to *src*'s target if *src* is *REF*
-- a *VUE* on *src*'s data if *src* is *SSO* or *VUE*
+- a *VUE* on *src*'s target if *src* is *VUE*
 
 If the return is a *REF*, the targetted data cannot be released before either  
 - the return is released
@@ -244,30 +255,32 @@ If the return is a *REF*, the targetted data cannot be released before either
 ```C
 // view own
 Buffet own;
-buffet_memcopy(&own, "Bonjour monsieur", 16);
-Buffet ref1 = buffet_view(&own, 0, 7);
-buffet_debug(&ref1); // tag:REF cstr:'Bonjour'
+buffet_memcopy(&own, "Bonjour monsieur buddy", 16);
+Buffet Bonjour = buffet_view(&own, 0, 7);
+buffet_debug(&Bonjour); // REF cstr:'Bonjour'
 
 // view ref
-Buffet ref2 = buffet_view(&ref1, 0, 3);
-buffet_debug(&ref2); // tag:REF cstr:'Bon'
+Buffet Bon = buffet_view(&Bonjour, 0, 3);
+buffet_debug(&Bon); // REF cstr:'Bon'
 
 // detach views
-buffet_append(&ref1, "!", 1);   // "Bonjour!"
-buffet_append(&ref2, "net", 3); // "Bonnet"
+buffet_append(&Bonjour, "!", 1);
+buffet_free(&Bon); 
 buffet_free(&own); // OK
 
 // view vue
 Buffet vue;
 buffet_memview(&vue, "Good day", 4); // "Good"
-Buffet vue2 = buffet_view(&vue, 0, 3);
-buffet_debug(&vue2); // tag:VUE cstr:'Goo'
+Buffet Goo = buffet_view(&vue, 0, 3);
+buffet_debug(&Goo); // VUE cstr:'Goo'
 
 // view sso
 Buffet sso;
-buffet_memcopy(&sso, "Bonjour", 7);
-Buffet vue3 = buffet_view(&sso, 0, 3);
-buffet_debug(&vue3); // tag:VUE cstr:'Bon'
+buffet_memcopy(&sso, "Hello", 5);
+Buffet Hell = buffet_view(&sso, 0, 4);
+buffet_debug(&Hell); // REF cstr:'Hell'
+buffet_free(&Hell); // OK
+buffet_free(&sso); // OK
 ```
 
 
@@ -277,18 +290,19 @@ bool buffet_free (Buffet *buf)
 ```
 Discards *buf*.  
 If *buf* was the last reference to owned data, the data is released.  
-In any case, *buf* is zeroed, making it an empty *SSO*.  
+
+Returns *true* and zeroes-out *buf* into an empty *SSO* if all good.  
+Returns *false* if not. E.g when *buf* is owning data with live views.
 
 ```C
-char text[] = "Le grand orchestre de Patato Valdez";
+char text[] = "Le grand orchestre";
 
 Buffet own;
 buffet_memcopy(&own, text, sizeof(text));
-Buffet ref = buffet_view(&own, 22, 13); // 'Patato Valdez'
+Buffet ref = buffet_view(&own, 9, 9); // 'orchestre'
 
-// Too soon but data marked for release
+// Too soon but marked for release
 buffet_free(&own);
-buffet_debug(&own); // tag:SSO cstr:''
 
 // Was last ref, data gets actually released
 buffet_free(&ref);
@@ -313,7 +327,7 @@ Buffet buf;
 buffet_memcopy(&buf, "abc", 3); 
 size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
 buffet_debug(&buf);
-// tag:SSO cap:14 len:6 cstr:'abcdef'
+// SSO cap:14 len:6 cstr:'abcdef'
 ```
 
 
@@ -337,8 +351,8 @@ int cnt;
 Buffet *parts = buffet_splitstr("Split me", " ", &cnt);
 for (int i=0; i<cnt; ++i)
     buffet_print(&parts[i]);
-// tag:VUE len:5 cstr:'Split'
-// tag:VUE len:2 cstr:'me'
+// VUE len:5 cstr:'Split'
+// VUE len:2 cstr:'me'
 free(parts);
 ```
 
@@ -354,7 +368,7 @@ int cnt;
 Buffet *parts = buffet_splitstr("Split me", " ", &cnt);
 Buffet back = buffet_join(parts, cnt, " ", 1);
 buffet_debug(&back);
-// tag:SSO cap:14 len:8 cstr:'Split me'
+// SSO cap:14 len:8 cstr:'Split me'
 ```
 
 
@@ -406,5 +420,5 @@ Prints *buf* state as viewed by the API.
 Buffet buf;
 buffet_memcopy(&buf, "foo", 3);
 buffet_debug(&buf);
-// tag:SSO cap:14 len:3 cstr:'foo'
+// SSO cap:14 len:3 cstr:'foo'
 ```
