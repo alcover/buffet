@@ -69,8 +69,7 @@ void check_export (Buffet *buf, size_t off, size_t len) {
 
 //=============================================================================
 void unew (size_t cap) {
-    Buffet buf; 
-    buffet_new(&buf, cap); 
+    Buffet buf = buffet_new(cap); 
     check(buf, 0, 0);
     buffet_free(&buf); 
 }
@@ -91,8 +90,7 @@ void new()
 //=============================================================================
 void umemcopy (size_t off, size_t len)
 {
-    Buffet buf;
-    buffet_memcopy (&buf, alpha+off, len);
+    Buffet buf = buffet_memcopy (alpha+off, len);
     check(buf, off, len);    
     buffet_free(&buf);
 }
@@ -106,8 +104,7 @@ void memcopy()
 //=============================================================================
 void umemview (size_t off, size_t len)
 {
-    Buffet buf;
-    buffet_memview (&buf, alpha+off, len);
+    Buffet buf = buffet_memview (alpha+off, len);
 
     check(buf, off, len);
     buffet_free(&buf);
@@ -122,8 +119,7 @@ void memview()
 //=============================================================================
 void ucopy (size_t off, size_t len)
 {
-    Buffet src;
-    buffet_memcopy (&src, alpha, alphalen);
+    Buffet src = buffet_memcopy (alpha, alphalen);
     Buffet buf = buffet_copy(&src, off, len);
 
     check(buf, off, len);
@@ -141,8 +137,7 @@ void copy()
 //=============================================================================
 
 #define uview(srclen, off, len) { \
-    Buffet src; \
-    buffet_memcopy (&src, alpha, srclen); \
+    Buffet src = buffet_memcopy (alpha, srclen); \
     Buffet view = buffet_view (&src, off, len); \
     check(view, off, len); \
     buffet_free(&view); \
@@ -151,8 +146,7 @@ void copy()
 
 void uview_ref (size_t srclen, size_t off, size_t len)
 {
-    Buffet buf;
-    buffet_memcopy (&buf, alpha, alphalen);
+    Buffet buf = buffet_memcopy (alpha, alphalen);
     Buffet src = buffet_view (&buf, 0, srclen);
     Buffet view = buffet_view (&src, off, len);
 
@@ -165,8 +159,7 @@ void uview_ref (size_t srclen, size_t off, size_t len)
 
 void uview_vue (size_t off, size_t len)
 {
-    Buffet vue;
-    buffet_memview (&vue, alpha, alphalen);
+    Buffet vue = buffet_memview (alpha, alphalen);
     Buffet view = buffet_view (&vue, off, len);
 
     check(view, off, len);
@@ -204,8 +197,7 @@ void view()
 
 void uappend_new (size_t cap, size_t len)
 {
-    Buffet buf;
-    buffet_new (&buf, cap);
+    Buffet buf = buffet_new (cap);
     buffet_append (&buf, alpha, len);
 
     check(buf, 0, len);
@@ -216,8 +208,7 @@ void uappend_new (size_t cap, size_t len)
 void uappend_memcopy (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buffet buf;
-    buffet_memcopy (&buf, alpha, initlen); 
+    Buffet buf = buffet_memcopy (alpha, initlen); 
     buffet_append (&buf, alpha+initlen, len); 
 
     check(buf, 0, totlen);
@@ -228,8 +219,7 @@ void uappend_memcopy (size_t initlen, size_t len)
 void uappend_memview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
-    Buffet buf;
-    buffet_memview (&buf, alpha, initlen);
+    Buffet buf = buffet_memview (alpha, initlen);
     buffet_append (&buf, alpha+initlen, len);
 
     check(buf, 0, totlen);
@@ -239,8 +229,7 @@ void uappend_memview (size_t initlen, size_t len)
 
 void uappend_view (size_t initlen, size_t len)
 {
-    Buffet src;
-    buffet_memcopy (&src, alpha, initlen);
+    Buffet src = buffet_memcopy (alpha, initlen);
     Buffet ref = buffet_view (&src, 0, initlen);
     buffet_append (&ref, alpha+initlen, len);
 
@@ -352,30 +341,25 @@ void splitjoin()
 }
 
 #define free_new(len) { \
-    Buffet buf; \
-    buffet_new (&buf, len); \
+    Buffet buf = buffet_new (len); \
     check_free(&buf, true); \
 }
 #define free_memcopy(len) { \
-    Buffet buf; \
-    buffet_memcopy (&buf, alpha, len); \
+    Buffet buf = buffet_memcopy (alpha, len); \
     check_free(&buf, true); \
 }
 #define free_memview(len) { \
-    Buffet buf; \
-    buffet_memview (&buf, alpha, len); \
+    Buffet buf = buffet_memview (alpha, len); \
     check_free(&buf, true); \
 }
 #define free_view(len) { \
-    Buffet own; \
-    buffet_memcopy (&own, alpha, 40); \
+    Buffet own = buffet_memcopy (alpha, 40); \
     Buffet ref = buffet_view (&own, 0, len); \
     check_free(&ref, true); \
     check_free(&own, true); \
 }
 #define free_copy(len) { \
-    Buffet own; \
-    buffet_memcopy (&own, alpha, 40); \
+    Buffet own = buffet_memcopy (alpha, 40); \
     Buffet cpy = buffet_copy (&own, 0, len); \
     check_free(&cpy, true); \
     check_free(&own, true); \
@@ -402,29 +386,25 @@ void free_()
 
 //=============================================================================
 void double_free(size_t len) {
-    Buffet buf;
-    buffet_memcopy (&buf, alpha, len);
+    Buffet buf = buffet_memcopy (alpha, len);
     check_free(&buf, true);
     check_free(&buf, true);
 }
 #define double_free_ref(srclen, len) { \
-    Buffet src; \
-    buffet_memcopy (&src, alpha, srclen); \
+    Buffet src = buffet_memcopy (alpha, srclen); \
     Buffet ref = buffet_view (&src, 0, len); \
     check_free(&ref, true); \
     check_free(&ref, true); \
     check_free(&src, true); \
 }
 #define free_alias(len, exp) { \
-    Buffet src; \
-    buffet_memcopy (&src, alpha, len); \
+    Buffet src = buffet_memcopy (alpha, len); \
     Buffet alias = src; \
     check_free(&src, true); \
     check_free(&alias, exp); \
 }
 #define free_ref_alias(len, freeref, freealias, freeown) { \
-    Buffet own; \
-    buffet_memcopy (&own, alpha, 40); \
+    Buffet own = buffet_memcopy (alpha, 40); \
     Buffet ref = buffet_view (&own, 0, len); \
     Buffet alias = ref; \
     check_free(&ref, freeref); \
@@ -432,8 +412,7 @@ void double_free(size_t len) {
     check_free(&own, freeown); \
 }
 #define free_own_before_view(len, freeown, freeref) { \
-    Buffet own; \
-    buffet_memcopy (&own, alpha, 40); \
+    Buffet own = buffet_memcopy (alpha, 40); \
     Buffet ref = buffet_view (&own, 0, len); \
     check_free(&own, freeown); \
     check_free(&ref, freeref); \
@@ -441,8 +420,7 @@ void double_free(size_t len) {
 
 void view_after_reloc (size_t initlen)
 {
-    Buffet src;
-    buffet_memcopy (&src, alpha, initlen);
+    Buffet src = buffet_memcopy (alpha, initlen);
     Buffet ref = buffet_view (&src, 0, initlen);
 
     buffet_append (&src, alpha, alphalen);
@@ -456,8 +434,7 @@ void view_after_reloc (size_t initlen)
 
 void append_view_after_reloc (size_t initlen, size_t len)
 {
-    Buffet src;
-    buffet_memcopy (&src, alpha, initlen);
+    Buffet src = buffet_memcopy (alpha, initlen);
     Buffet ref = buffet_view (&src, 0, initlen);
     // buffet_debug(&ref);
     

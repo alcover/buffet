@@ -57,8 +57,7 @@ int main()
 {
     char text[] = "The train goes";
     
-    Buffet vue;
-    buffet_memview (&vue, text+4, 5);
+    Buffet vue = buffet_memview (text+4, 5);
     buffet_print(&vue); // "train"
 
     text[4] = 'b';
@@ -190,26 +189,24 @@ If either fails, the operation is aborted and the Buffet struct possibly zeroed.
 
 ### buffet_new
 ```C
-void buffet_new (Buffet *dst, size_t cap)
+Buffet buffet_new (size_t cap)
 ```
-Create Buffet *dst* of minimum capacity *cap*.  
+Create a new Buffet of minimum capacity *cap*.  
 
 ```C
-Buffet buf;
-buffet_new(&buf, 20);
+Buffet buf = buffet_new(20);
 buffet_debug(&buf); 
 // OWN cap:20 len:0 cstr:''
 ```
 
 ### buffet_memcopy
 ```C
-void buffet_memcopy (Buffet *dst, const char *src, size_t len)
+Buffet buffet_memcopy (const char *src, size_t len)
 ```
-Copy *len* bytes from *src* into new Buffet *dst*.  
+Create a new Buffet by copying *len* bytes from *src*.  
 
 ```C
-Buffet copy;
-buffet_memcopy(&copy, "Bonjour", 3);
+Buffet copy = buffet_memcopy("Bonjour", 3);
 buffet_debug(&copy); 
 // SSO cap:14 len:3 cstr:'Bon'
 
@@ -217,15 +214,14 @@ buffet_debug(&copy);
 
 ### buffet_memview
 ```C
-void buffet_memview (Buffet *dst, const char *src, size_t len)
+Buffet buffet_memview (const char *src, size_t len)
 ```
-View *len* bytes from *src* into new Buffet *dst*.  
+Create a new Buffet viewing *len* bytes from *src*.  
 You get a window into *src* without copy or allocation.
 
 ```C
 char src[] = "Eat Buffet!";
-Buffet view;
-buffet_memview(&view, src+4, 6);
+Buffet view = buffet_memview(src+4, 6);
 buffet_debug(&view);
 // VUE cap:0 len:6 cstr:'Buffet'
 ```
@@ -255,31 +251,28 @@ If the return is a *REF*, the targetted data cannot be released before either
 
 ```C
 // view own
-Buffet own;
-buffet_memcopy(&own, "Bonjour monsieur buddy", 16);
+Buffet own = buffet_memcopy("Bonjour monsieur buddy", 16);
 Buffet Bonjour = buffet_view(&own, 0, 7);
-buffet_debug(&Bonjour); // REF cstr:'Bonjour'
+buffet_debug(&Bonjour); // tag:REF cstr:'Bonjour'
 
 // view ref
 Buffet Bon = buffet_view(&Bonjour, 0, 3);
-buffet_debug(&Bon); // REF cstr:'Bon'
+buffet_debug(&Bon); // tag:REF cstr:'Bon'
 
 // detach views
-buffet_append(&Bonjour, "!", 1);
+buffet_append(&Bonjour, "!", 1); // "Bonjour!"
 buffet_free(&Bon); 
 buffet_free(&own); // OK
 
 // view vue
-Buffet vue;
-buffet_memview(&vue, "Good day", 4); // "Good"
+Buffet vue = buffet_memview("Good day", 4); // "Good"
 Buffet Goo = buffet_view(&vue, 0, 3);
-buffet_debug(&Goo); // VUE cstr:'Goo'
+buffet_debug(&Goo); // tag:VUE cstr:'Goo'
 
 // view sso
-Buffet sso;
-buffet_memcopy(&sso, "Hello", 5);
+Buffet sso = buffet_memcopy("Hello", 5);
 Buffet Hell = buffet_view(&sso, 0, 4);
-buffet_debug(&Hell); // REF cstr:'Hell'
+buffet_debug(&Hell); // tag:VUE cstr:'Hell'
 buffet_free(&Hell); // OK
 buffet_free(&sso); // OK
 ```
@@ -298,8 +291,7 @@ Returns *false* if not. E.g when *buf* is owning data with live views.
 ```C
 char text[] = "Le grand orchestre";
 
-Buffet own;
-buffet_memcopy(&own, text, sizeof(text));
+Buffet own = buffet_memcopy(text, sizeof(text));
 Buffet ref = buffet_view(&own, 9, 9); // 'orchestre'
 
 // Too soon but marked for release
@@ -324,8 +316,7 @@ Returns new length or 0 on error.
 If over capacity, *dst* gets reallocated. 
 
 ```C
-Buffet buf;
-buffet_memcopy(&buf, "abc", 3); 
+Buffet buf = buffet_memcopy("abc", 3); 
 size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
 buffet_debug(&buf);
 // SSO cap:14 len:6 cstr:'abcdef'

@@ -3,8 +3,7 @@
 int main() {
 
 // view own
-Buffet own;
-buffet_memcopy(&own, "Bonjour monsieur buddy", 16);
+Buffet own = buffet_memcopy("Bonjour monsieur buddy", 16);
 Buffet Bonjour = buffet_view(&own, 0, 7);
 buffet_debug(&Bonjour); // tag:REF cstr:'Bonjour'
 
@@ -18,14 +17,12 @@ buffet_free(&Bon);
 buffet_free(&own); // OK
 
 // view vue
-Buffet vue;
-buffet_memview(&vue, "Good day", 4); // "Good"
+Buffet vue = buffet_memview("Good day", 4); // "Good"
 Buffet Goo = buffet_view(&vue, 0, 3);
 buffet_debug(&Goo); // tag:VUE cstr:'Goo'
 
 // view sso
-Buffet sso;
-buffet_memcopy(&sso, "Hello", 5);
+Buffet sso = buffet_memcopy("Hello", 5);
 Buffet Hell = buffet_view(&sso, 0, 4);
 buffet_debug(&Hell); // tag:VUE cstr:'Hell'
 buffet_free(&Hell); // OK

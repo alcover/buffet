@@ -4,8 +4,7 @@ int main() {
 
 char text[] = "Le grand orchestre";
 
-Buffet own;
-buffet_memcopy(&own, text, sizeof(text));
+Buffet own = buffet_memcopy(text, sizeof(text));
 Buffet ref = buffet_view(&own, 9, 9); // 'orchestre'
 
 // Too soon but marked for release

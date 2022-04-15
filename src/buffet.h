@@ -39,30 +39,33 @@ typedef union Buffet {
 extern "C" {
 #endif
 
-void    buffet_new (Buffet *dst, size_t cap);
-void    buffet_memcopy (Buffet *dst, const char *src, size_t len);
-void    buffet_memview (Buffet *dst, const char *src, size_t len);
-Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
-Buffet  buffet_clone (const Buffet *src);
-size_t  buffet_append (Buffet *dst, const char *src, size_t len);
+// Create
+Buffet buffet_new (size_t cap);
+Buffet buffet_memcopy (const char *src, size_t len);
+Buffet buffet_memview (const char *src, size_t len);
+Buffet buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
+Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len);
+Buffet buffet_clone (const Buffet *src);
+Buffet buffet_join (const Buffet *list, int cnt, 
+                     const char* sep, size_t seplen);
 Buffet* buffet_split (const char* src, size_t srclen,
                       const char* sep, size_t seplen, int *outcnt);
 Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
-Buffet  buffet_join (const Buffet *list, int cnt, 
-                     const char* sep, size_t seplen);
+
+// Modify
+size_t  buffet_append (Buffet *dst, const char *src, size_t len);
 bool    buffet_free (Buffet *buf);
 
+// Access
+const char* buffet_data (const Buffet *buf);
+const char* buffet_cstr (const Buffet *buf, bool *mustfree);
+char*   buffet_export (const Buffet *buf);
 size_t  buffet_cap (const Buffet *buf);
 size_t  buffet_len (const Buffet *buf);
-const char* 
-        buffet_data (const Buffet *buf);
-const char* 
-        buffet_cstr (const Buffet *buf, bool *mustfree);
-char*   buffet_export (const Buffet *buf);
 
-void    buffet_print (const Buffet *buf);
-void    buffet_debug (const Buffet *buf);
+// Util
+void buffet_print (const Buffet *buf);
+void buffet_debug (const Buffet *buf);
 
 #ifdef __cplusplus
 }

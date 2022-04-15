@@ -4,8 +4,7 @@ int main()
 {
 	char text[] = "The train goes";
 	
-	Buffet vue;
-	buffet_memview (&vue, text+4, 5);
+	Buffet vue = buffet_memview (text+4, 5);
 	buffet_print(&vue); // "train"
 
 	text[4] = 'b';

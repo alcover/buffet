@@ -107,8 +107,7 @@ APPEND_buffet (benchmark::State& state)
 {
 	APPEND_INIT
     for (auto _ : state) {
-    	Buffet dst;
-        buffet_new(&dst, 0);
+    	Buffet dst = buffet_new(0);
         for (int i=0; i<iter; ++i) buffet_append(&dst, src, srclen);
         const char *ret = buffet_data(&dst);
 
