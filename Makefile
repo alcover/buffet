@@ -55,6 +55,6 @@ benchcpp:
 	@ ./$(benchcpp) --benchmark_color=false
 
 clean:
-	@ rm -f bin/*
+	@ rm -rf bin/*
 
 .PHONY: all check benchcpp clean
