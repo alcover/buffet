@@ -16,7 +16,7 @@ check =		bin/check
 benchcpp =	bin/benchcpp
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) $(examples) $(benchcpp)
+all: $(lib) $(asm) $(check) $(examples) #$(benchcpp)
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -33,7 +33,7 @@ endif
 $(check): src/check.c $(lib)
 	@ echo make $@
 	@ $(CP) -O0 $^ -o $@
-	@ ./$@
+# 	@ ./$@
 
 # requires libbenchmark-dev
 $(benchcpp): src/bench.cpp $(lib) bin/utilcpp
