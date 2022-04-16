@@ -12,12 +12,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include "buffet.h"
 #include "log.h"
 
-typedef enum {
-    SSO = 0,
-    OWN,
-    REF,
-    VUE
-} Tag;
+typedef enum {SSO=0, OWN, REF, VUE} Tag;
 
 typedef struct {
     uint32_t refcnt;
@@ -58,7 +53,6 @@ getdata (const Buffet *buf, Tag tag) {
         return buf->sso.data;
     } else if (tag==REF) {
         const Buffet *target = gettarget(buf);
-        // return getdata(target,TAG(target)) + REFOFF(buf);
         return target->ptr.data + REFOFF(buf);
     } else {
         return buf->ptr.data;
@@ -87,7 +81,7 @@ new_own (size_t cap, const char *src, size_t len)
         ERR_ALLOC
         // return ZERO;
         return (Buffet) {
-            .ptr.data = NULL,
+            .ptr.data = NULL, //?
             .ptr.len = 0,
             .ptr.aux = 0,
             .ptr.tag = OWN            
@@ -113,15 +107,16 @@ static Buffet
 new_ref (const Buffet *src, ptrdiff_t off, size_t len) 
 {
     // assert ((intptr_t)src % STEP == 0);
-    // assert(TAG(src)==OWN);
+    // assert (TAG(src)==OWN);
     
     Store *store = STORE(src);
+
     if (store->canary != CANARY) {
         ERR_CANARY
         return ZERO;
     }
 
-    ++ store->refcnt;
+    ++ store->refcnt; // here or in caller ?
 
     return (Buffet) {
         .ptr.data = (char*)((intptr_t)src + (off % STEP)),
@@ -223,10 +218,11 @@ buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 {
     Tag tag = TAG(src);
 
-    if (off+len > getlen(src,tag)) 
+    if (off+len > getlen(src,tag)) {
         return ZERO;
-    else
+    } else {
         return buffet_memcopy (getdata(src,tag)+off, len);
+    }
 }
 
 
@@ -248,13 +244,14 @@ buffet_clone (const Buffet *src)
  
 
 Buffet
-buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
+buffet_view (Buffet *src, ptrdiff_t off, size_t len)
 {
     Tag tag = TAG(src);
     Buffet ret;
 
-    if (!len) return ZERO;
-    if (off+len > getlen(src,tag)) return ZERO;
+    if (!len || (off+len > getlen(src,tag))) {
+        return ZERO;
+    }
 
     switch(tag) {
         
@@ -262,7 +259,7 @@ buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
             size_t srclen = src->sso.len;
             // convert src to OWN to get a refcnt.
             // todo: implications (ex. VUE on SSO?)
-            *(Buffet*)src = new_own (srclen, src->sso.data, srclen);
+            *src = new_own (srclen, src->sso.data, srclen);
             ret = new_ref (src, off, len);
         }   break;
         
@@ -316,7 +313,7 @@ buffet_free (Buffet *buf)
     } else if (tag==REF) {
 
         Buffet *target = (Buffet*)gettarget(buf);
-        assert(TAG(target)==OWN);
+        // assert(TAG(target)==OWN);
 
         Store *store = STORE(target); //check ?
         -- store->refcnt;
