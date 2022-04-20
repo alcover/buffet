@@ -108,7 +108,6 @@ APPEND_cpp/64            727 us
 APPEND_buffet/1           77 us
 APPEND_buffet/8           90 us
 APPEND_buffet/64         134 us
-
 ```
 
 
@@ -169,7 +168,8 @@ If either fails, the operation is aborted and the Buffet struct possibly zeroed.
 [buffet_memcopy](#buffet_memcopy)  
 [buffet_memview](#buffet_memview)  
 [buffet_copy](#buffet_copy)  
-[buffet_view](#buffet_view)  
+[buffet_view](#buffet_view)
+[buffet_clone](#buffet_clone)  
 [buffet_append](#buffet_append)  
 [buffet_split](#buffet_split)  
 [buffet_splitstr](#buffet_splitstr)  
@@ -275,6 +275,30 @@ Buffet Hell = buffet_view(&sso, 0, 4);
 buffet_debug(&Hell); // tag:VUE cstr:'Hell'
 buffet_free(&Hell); // OK
 buffet_free(&sso); // OK
+```
+
+
+### buffet_clone
+```C
+Buffet buffet_clone (const Buffet *src)
+```
+Duplicates *src*.  
+Use this intead of assigning a Buffet to another.  
+
+```C
+Buffet src = buffet_memcopy("Hello", 5);
+Buffet cpy = src; // BAD
+Buffet cpy = buffet_clone(&src); // GOOD
+buffet_debug(&cpy);
+// SSO cap:14 len:5 cstr:'Hello'
+```
+
+Rem: assigning would mostly work but mess up refcounting (without crash if Store protections are enabled) :  
+```C
+Buffet alias = sso; //ok
+Buffet alias = vue; //ok
+Buffet alias = own; //not refcounted
+Buffet alias = ref; //not refcounted
 ```
 
 
