@@ -96,18 +96,19 @@ While extensive, tests may not yet cover *all* cases.
 (requires *libbenchmark-dev*)  
 
 NB: No effort has yet been done on optimization.
+NB: Bench is amateurish, maybe unfair.
 
 On my weak Thinkpad :  
 ```
-SPLITJOIN_cppView       3658 ns
-SPLITJOIN_plainC        3009 ns
-SPLITJOIN_buffet        1376 ns
-APPEND_cpp/1              53 us
-APPEND_cpp/8             112 us
-APPEND_cpp/64            727 us
-APPEND_buffet/1           77 us
-APPEND_buffet/8           90 us
-APPEND_buffet/64         134 us
+SPLITJOIN_cppView       3492 ns
+SPLITJOIN_plainC        2923 ns
+SPLITJOIN_buffet        1380 ns
+APPEND_cpp/1              26 us
+APPEND_cpp/8              86 us
+APPEND_cpp/64            668 us
+APPEND_buffet/1           74 us
+APPEND_buffet/8           87 us
+APPEND_buffet/64         132 us
 ```
 
 
