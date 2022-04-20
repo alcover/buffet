@@ -1,0 +1,13 @@
+2022-04-20  alco
+	
+	v0.5.1
+	
+	* buffet_clone
+
+	* buffet_append: solving self-append 
+	(as pointed by Justas Masiulis, if source is Buffet itself and relocates, 
+	we copy from invalid memory)
+
+	* bench: fast append_cpp
+	
+	* OVERALLOC int
