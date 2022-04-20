@@ -39,7 +39,7 @@ SPLITJOIN_cppView (benchmark::State& state)
 {
     for (auto _ : state) {
         vector<string_view> parts = split_cppview(TEXT, sep);
-        const char* ret = join_cppview(parts, sep);
+        const char* ret = join_cppview(parts, sep); // unfair
 
         assert(!strcmp(ret, TEXT));
         free(ret);
@@ -68,6 +68,7 @@ SPLITJOIN_buffet (benchmark::State& state)
         int cnt = 0;
         Buffet *parts = buffet_splitstr(TEXT, sep, &cnt);
         Buffet back = buffet_join(parts, cnt, sep, strlen(sep));
+        
         bool mustfree;
         const char *ret = buffet_cstr(&back, &mustfree);
 
@@ -90,33 +91,39 @@ static void
 APPEND_cpp (benchmark::State& state) 
 {
 	APPEND_INIT
+    // faster and fairer than plain string (Justas Masiulis)
+    string_view srcv = string_view(src, srclen);
+    
     for (auto _ : state) {
     	string dst;
-        for (int i=0; i<iter; ++i) dst += src;
+        for (int i=0; i<iter; ++i) dst += srcv;
+        
         const char *ret = dst.data();
-
+        benchmark::DoNotOptimize(ret); // useless ?
         assert(!strcmp(ret, exp));
     }
 	
-	free(exp);
 	free(src);
+	free(exp);
 }
 
 static void 
 APPEND_buffet (benchmark::State& state) 
 {
 	APPEND_INIT
+    
     for (auto _ : state) {
     	Buffet dst = buffet_new(0);
-        for (int i=0; i<iter; ++i) buffet_append(&dst, src, srclen);
+        for (int i=0; i<iter; ++i) buffet_append (&dst, src, srclen);
+        
         const char *ret = buffet_data(&dst);
-
+        benchmark::DoNotOptimize(ret);
         assert(!strcmp(ret, exp));
         buffet_free(&dst);
     }
 	
-	free(exp);
 	free(src);
+	free(exp);
 }
 
 //=====================================================================
