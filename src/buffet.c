@@ -251,7 +251,7 @@ buffet_copy (const Buffet *src, ptrdiff_t off, size_t len)
 
 
 Buffet
-buffet_clone (const Buffet *src)
+buffet_dup (const Buffet *src)
 {
     Tag tag = TAG(src);
     
@@ -259,7 +259,7 @@ buffet_clone (const Buffet *src)
         size_t len = src->ptr.len;
         return new_own (len, src->ptr.data, len);
     } else if (tag==REF) { 
-        Store *store = STORE(gettarget(src));
+        Store *store = STORE(gettarget(src)); //check?
         ++ store->refcnt;
     }
 

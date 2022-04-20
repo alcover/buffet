@@ -135,7 +135,7 @@ void copy() {
 //=============================================================================
 void uclone (ptrdiff_t off, size_t len) {
     Buffet src = buffet_memcopy (alpha+off, len);
-    Buffet buf = buffet_clone(&src);
+    Buffet buf = buffet_dup(&src);
     check(buf, off, len);
     buffet_free(&buf);
     buffet_free(&src);

@@ -141,7 +141,7 @@ buffet_append(&buf, foo); // OK
 ```C
 Buffet buf;
 // (...)
-Buffet alias = buf; // not recommended. Use buffet_clone().
+Buffet alias = buf; // not recommended. Use buffet_dup().
 buffet_free(&buf);
 buffet_free(&alias); // OK
 ```
@@ -169,7 +169,7 @@ On some operations like *view*, *append* or *free*, we check the Store for a liv
 [buffet_memview](#buffet_memview)  
 [buffet_copy](#buffet_copy)  
 [buffet_view](#buffet_view)  
-[buffet_clone](#buffet_clone)  
+[buffet_dup](#buffet_dup)  
 [buffet_append](#buffet_append)  
 [buffet_split](#buffet_split)  
 [buffet_splitstr](#buffet_splitstr)  
@@ -278,9 +278,9 @@ buffet_free(&sso); // OK
 ```
 
 
-### buffet_clone
+### buffet_dup
 ```C
-Buffet buffet_clone (const Buffet *src)
+Buffet buffet_dup (const Buffet *src)
 ```
 Duplicates *src*.  
 Use this intead of assigning a Buffet to another.  
@@ -288,7 +288,7 @@ Use this intead of assigning a Buffet to another.
 ```C
 Buffet src = buffet_memcopy("Hello", 5);
 Buffet cpy = src; // BAD
-Buffet cpy = buffet_clone(&src); // GOOD
+Buffet cpy = buffet_dup(&src); // GOOD
 buffet_debug(&cpy);
 // SSO cap:14 len:5 cstr:'Hello'
 ```
