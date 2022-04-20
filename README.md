@@ -95,7 +95,7 @@ While extensive, tests may not yet cover *all* cases.
 `$ make && make benchcpp`  
 (requires *libbenchmark-dev*)  
 
-NB: No effort has yet been done on optimization.
+NB: No effort has yet been done on optimization.  
 NB: Bench is amateurish, maybe unfair.
 
 On my weak Thinkpad :  
@@ -158,8 +158,7 @@ struct Store {
 }
 ```
 
-On some operations like *view*, *append* or *free*, we check the Store header for a live canary and coherent refcount.  
-If either fails, the operation is aborted and the Buffet struct possibly zeroed. 
+On some operations like *view*, *append* or *free*, we check the Store for a live canary and coherent refcount. If either fails, the operation is aborted and the Buffet struct possibly zeroed. 
 
 ---
 
@@ -169,7 +168,7 @@ If either fails, the operation is aborted and the Buffet struct possibly zeroed.
 [buffet_memcopy](#buffet_memcopy)  
 [buffet_memview](#buffet_memview)  
 [buffet_copy](#buffet_copy)  
-[buffet_view](#buffet_view)
+[buffet_view](#buffet_view)  
 [buffet_clone](#buffet_clone)  
 [buffet_append](#buffet_append)  
 [buffet_split](#buffet_split)  
