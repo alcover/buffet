@@ -117,8 +117,7 @@ void memview()
 }
 
 //=============================================================================
-void ucopy (size_t off, size_t len)
-{
+void ucopy (size_t off, size_t len) {
     Buffet src = buffet_memcopy (alpha, alphalen);
     Buffet buf = buffet_copy(&src, off, len);
 
@@ -127,11 +126,24 @@ void ucopy (size_t off, size_t len)
     buffet_free(&src);
 }
 
-void copy()
-{
+void copy() {
     serie(ucopy, 0);
     serie(ucopy, 8);
     ucopy (0, alphalen);
+}
+
+//=============================================================================
+void uclone (ptrdiff_t off, size_t len) {
+    Buffet src = buffet_memcopy (alpha+off, len);
+    Buffet buf = buffet_clone(&src);
+    check(buf, off, len);
+    buffet_free(&buf);
+    buffet_free(&src);
+}
+
+void clone() {
+    serie(uclone, 0);
+    serie(uclone, 8);
 }
 
 //=============================================================================
@@ -193,7 +205,6 @@ void view()
 }
 
 //=============================================================================
-// Confusing ? and not covering all paths.
 
 void uappend_new (size_t cap, size_t len)
 {
@@ -205,15 +216,12 @@ void uappend_new (size_t cap, size_t len)
     buffet_free(&buf);    
 }
 
-void uappend_memcopy (size_t initlen, size_t len)
-{
-    size_t totlen = initlen+len;
-    Buffet buf = buffet_memcopy (alpha, initlen); 
-    buffet_append (&buf, alpha+initlen, len); 
-
-    check(buf, 0, totlen);
-
-    buffet_free(&buf);    
+#define uappend_memcopy(initlen, len) {\
+    Buffet buf = buffet_memcopy (alpha, initlen); \
+    buffet_append (&buf, alpha+initlen, len); \
+    size_t totlen = initlen+len;\
+    check(buf, 0, totlen);\
+    buffet_free(&buf);    \
 }
 
 void uappend_memview (size_t initlen, size_t len)
@@ -237,6 +245,21 @@ void uappend_view (size_t initlen, size_t len)
     
     buffet_free(&ref); 
     buffet_free(&src);    
+}
+// justas idea
+void uappend_self (size_t len)
+{
+    Buffet buf = buffet_memcopy (alpha, len);
+    size_t finlen = 2*len;
+    memcpy(tmp, alpha, len);
+    memcpy(tmp+len, alpha, len);
+    tmp[finlen] = 0;
+
+    buffet_append (&buf, buffet_data(&buf), buffet_len(&buf));
+    assert_int(buffet_len(&buf), finlen);
+    assert_str(buffet_data(&buf), tmp);
+
+    buffet_free(&buf);
 }
 
 void append()
@@ -272,6 +295,12 @@ void append()
     uappend_view (8, 4);
     uappend_view (8, 20);
     uappend_view (20, 20);
+
+    uappend_self (0);
+    uappend_self (4);
+    uappend_self (10);
+    uappend_self (16);
+    // todo crazy self cases : crossing NUL, garbage only, ...
 }
 
 //==============================================================================
@@ -491,6 +520,7 @@ int main()
     memcopy();
     memview();
     copy();
+    clone();
     view();
     append();
     splitjoin();
