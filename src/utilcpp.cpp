@@ -35,9 +35,9 @@ split_cppview(const char* src, const char* sep)
     return parts;
 }
 
-
+// alco
 char*
-join_cppview(vector<string_view> parts, const char *sep)
+_join_cppview(vector<string_view> parts, const char *sep)
 {
 	const int cnt = parts.size();
     const size_t seplen = strlen(sep);
@@ -65,8 +65,35 @@ join_cppview(vector<string_view> parts, const char *sep)
         }
     }    
 
-    // for (auto& part : parts) {}
     free(lengths);
+
+    return ret;
+}
+
+
+// Justas Masiulis
+char* 
+join_cppview(const std::vector<std::string_view>& parts, std::string_view sep)
+{
+    if(parts.empty()) return nullptr;
+
+    size_t total = sep.size() * (parts.size() - 1);
+    for (auto&& part : parts) total += part.size();
+
+    auto ret = (char*)malloc(total+1); //+1:alco
+    if (!ret) return nullptr;
+    ret[total] = 0; //alco
+
+    auto ptr = ret;
+    for(auto&& part : parts) {
+        memcpy(ptr, part.data(), part.size());
+        ptr += part.size();
+
+        if(&part != &parts.back()) {
+            memcpy(ptr, sep.data(), sep.size());
+            ptr += sep.size();
+        }
+    }
 
     return ret;
 }

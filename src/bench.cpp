@@ -2,12 +2,12 @@
 #include "utilcpp.h"
 extern "C" {
 	#include "buffet.h"
-	#include "log.h"
 	#include "util.h"
+	#include "log.h"
 }
 
 #define SPC " "
-#define SEP SPC
+#define SEP SPC 
 
 const char *TEXT =
 "a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
@@ -35,19 +35,7 @@ static char* repeat(size_t n) {
 
 //=============================================================================
 static void 
-SPLITJOIN_cppView (benchmark::State& state) 
-{
-    for (auto _ : state) {
-        vector<string_view> parts = split_cppview(TEXT, sep);
-        const char* ret = join_cppview(parts, sep); // unfair
-
-        assert(!strcmp(ret, TEXT));
-        free(ret);
-    }
-}
-
-static void 
-SPLITJOIN_plainC (benchmark::State& state) 
+SPLITJOIN_plainc (benchmark::State& state) 
 {
     for (auto _ : state) {
         int cnt = 0;
@@ -62,18 +50,27 @@ SPLITJOIN_plainC (benchmark::State& state)
 }
 
 static void 
+SPLITJOIN_cppview (benchmark::State& state) 
+{
+    for (auto _ : state) {
+        vector<string_view> parts = split_cppview(TEXT, sep);
+        const char* ret = join_cppview(parts, sep);
+
+        assert(!strcmp(ret, TEXT));
+        free(ret);
+    }
+}
+
+static void 
 SPLITJOIN_buffet (benchmark::State& state) 
 {
     for (auto _ : state) {
         int cnt = 0;
         Buffet *parts = buffet_splitstr(TEXT, sep, &cnt);
         Buffet back = buffet_join(parts, cnt, sep, strlen(sep));
-        
-        bool mustfree;
-        const char *ret = buffet_cstr(&back, &mustfree);
+        const char *ret = buffet_data(&back);
 
         assert(!strcmp(ret, TEXT));
-        if (mustfree) free(ret);
         buffet_free(&back);
         free(parts);
     }
@@ -132,8 +129,8 @@ APPEND_buffet (benchmark::State& state)
 #define END 64
 #define MUL 8
 
-BENCHMARK(SPLITJOIN_cppView);
-BENCHMARK(SPLITJOIN_plainC);
+BENCHMARK(SPLITJOIN_plainc);
+BENCHMARK(SPLITJOIN_cppview);
 BENCHMARK(SPLITJOIN_buffet);
 BENCHMARK(APPEND_cpp)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
 BENCHMARK(APPEND_buffet)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
