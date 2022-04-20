@@ -10,7 +10,9 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stdint.h>
 #include <stdbool.h>
 
+#ifndef BUFFET_STACK_MEM
 #define BUFFET_STACK_MEM 1024
+#endif
 
 // Do not touch
 #define BUFFET_SIZE 16
