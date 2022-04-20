@@ -9,6 +9,7 @@ $(shell mkdir -p bin)
 $(shell mkdir -p bin/ex)
 
 OBJDUMP := $(shell objdump -v 2>/dev/null)
+LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 
 lib =		bin/buffet
 asm =		bin/buffet.s
@@ -16,7 +17,7 @@ check =		bin/check
 benchcpp =	bin/benchcpp
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) $(examples) bin/try #$(benchcpp)
+all: $(lib) $(asm) $(check) $(examples) $(benchcpp) bin/try
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -38,7 +39,12 @@ $(check): src/check.c $(lib)
 # requires libbenchmark-dev
 $(benchcpp): src/bench.cpp $(lib) bin/utilcpp
 	@ echo make $@
-	@ $(CPP) -O2 -w -lbenchmark -lpthread $^ -o $@
+ifdef LIBBENCHMARK
+	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
+else
+	@ echo libbenchmark not installed
+endif
+
 
 bin/utilcpp: src/utilcpp.cpp src/utilcpp.h
 	@ echo make $@
