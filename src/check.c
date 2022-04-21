@@ -317,41 +317,31 @@ void append()
     buffet_free(&joined);\
 }
 
+#define SPLOIN(a,b,sep) \
+    usplitjoin ("", #sep); \
+    usplitjoin (#sep, #sep); \
+    usplitjoin (#a, #sep); \
+    usplitjoin (#a #sep,  #sep);  \
+    usplitjoin (#a #sep #b,  #sep);  \
+    usplitjoin (#a #sep #b #sep,  #sep);  \
+    usplitjoin (#sep #a,  #sep); \
+    usplitjoin (#sep #a #sep,  #sep);  \
+    usplitjoin (#sep #a #sep #b,  #sep);  \
+    usplitjoin (#sep #a #sep #b #sep,  #sep);  \
+    usplitjoin (#a #sep #sep,  #sep);  \
+    usplitjoin (#a #sep #sep #b,  #sep);  \
+    usplitjoin (#a #sep #sep #b #sep #sep,  #sep);  \
+    usplitjoin (#sep #sep #a,  #sep); \
+    usplitjoin (#sep #sep #a #sep #sep,  #sep);  \
+    usplitjoin (#sep #sep #a #sep #sep #b,  #sep);  \
+    usplitjoin (#sep #sep #a #sep #sep #b #sep #sep, #sep); 
+
 void splitjoin() 
 { 
-    usplitjoin ("", "|");
-    usplitjoin ("|", "|");
-    usplitjoin ("a", "|");
-    usplitjoin ("a|", "|"); 
-    usplitjoin ("a|b", "|"); 
-    usplitjoin ("a|b|", "|"); 
-    usplitjoin ("|a", "|");
-    usplitjoin ("|a|", "|"); 
-    usplitjoin ("|a|b", "|"); 
-    usplitjoin ("|a|b|", "|"); 
-    usplitjoin ("a||", "|"); 
-    usplitjoin ("a||b", "|"); 
-    usplitjoin ("a||b||", "|"); 
-    usplitjoin ("||a", "|");
-    usplitjoin ("||a||", "|"); 
-    usplitjoin ("||a||b", "|"); 
-    usplitjoin ("||a||b||", "|"); 
-    
-    usplitjoin ("abc", "|"); 
-    usplitjoin ("abc|", "|"); 
-    usplitjoin ("abc|def", "|"); 
-    usplitjoin ("abc|def|", "|"); 
-    usplitjoin ("|abc", "|"); 
-    usplitjoin ("|abc|", "|"); 
-    usplitjoin ("|abc|def", "|"); 
-    usplitjoin ("|abc|def|", "|"); 
-    usplitjoin ("abc||", "|"); 
-    usplitjoin ("abc||def", "|"); 
-    usplitjoin ("abc||def||", "|"); 
-    usplitjoin ("||abc", "|"); 
-    usplitjoin ("||abc||", "|"); 
-    usplitjoin ("||abc||def", "|"); 
-    usplitjoin ("||abc||def||", "|"); 
+    SPLOIN (a, b, |)
+    SPLOIN (a, b, ||)
+    SPLOIN (foo, bar, |)
+    SPLOIN (foo, bar, ||)
 }
 
 //=============================================================================
@@ -494,7 +484,7 @@ void danger()
     double_free_ref(40, 20);
 
     free_alias(8, true);
-    free_alias(40, false);
+    free_alias(40, true);
     
     free_own_before_view (0, true, true)
     free_own_before_view (8, false, true)
@@ -512,10 +502,19 @@ void danger()
 }
 
 //=============================================================================
+void zero(){
+    assert (!ZERO.ptr.data);
+    assert (!ZERO.ptr.len);
+    assert (!ZERO.ptr.aux);
+    assert (!ZERO.ptr.tag);
+}
+
+//=============================================================================
 int main()
 {
     LOG("unit tests... ");
 
+    zero();
     new();
     memcopy();
     memview();
