@@ -1,18 +1,8 @@
-on: 
-  push:
-    paths:
-      - 'src/**'
-      - 'Makefile'
-  pull_request:
-    paths:
-      - 'src/**'
-      - 'Makefile'
+on: [push, pull_request]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
-
     strategy:
       fail-fast: true
       matrix:
