@@ -1,5 +1,13 @@
 2022-04-20  alco
 	
+	v0.5.2
+	
+	* buffet_free: only return false on a valid owner with live views
+
+	* validate Store on every access
+
+2022-04-20  alco
+	
 	v0.5.1
 	
 	* buffet_clone
