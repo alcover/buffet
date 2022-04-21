@@ -1,7 +1,12 @@
+# `make dbg=1` to enable asserts
+ifndef dbg
+	debug = -DNDEBUG
+endif
+
 CC = gcc
 OPTIM = -O2
 WARN = -Wall -Wextra
-CP = $(CC) -std=c11 $(WARN) -g
+CP = $(CC) -std=c11 $(WARN) -g $(debug)
 CPP = g++ -std=c++2a $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
@@ -11,13 +16,13 @@ $(shell mkdir -p bin/ex)
 OBJDUMP := $(shell objdump -v 2>/dev/null)
 LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 
-lib =		bin/buffet
-asm =		bin/buffet.s
-check =		bin/check
-benchcpp =	bin/benchcpp
+lib = bin/buffet
+asm = bin/buffet.s
+check = bin/check
+bench =	bin/bench
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) $(examples) $(benchcpp) bin/try
+all: $(lib) $(asm) $(check) $(examples) $(bench) #bin/try
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -37,7 +42,7 @@ $(check): src/check.c $(lib)
 	@ ./$@
 
 # requires libbenchmark-dev
-$(benchcpp): src/bench.cpp $(lib) bin/utilcpp
+$(bench): src/bench.cpp $(lib) bin/utilcpp
 	@ echo make $@
 ifdef LIBBENCHMARK
 	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
@@ -61,10 +66,10 @@ bin/%: src/%.c $(lib)
 check:
 	@ ./$(check)
 
-benchcpp: 
-	@ ./$(benchcpp) --benchmark_color=false
+bench: 
+	@ ./$(bench) --benchmark_color=false
 
 clean:
 	@ rm -rf bin/*
 
-.PHONY: all check benchcpp clean
+.PHONY: all check bench clean
