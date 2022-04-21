@@ -1,7 +1,8 @@
 on: [push, pull_request]
-  paths:
-    - 'src/**'
-    - 'Makefile'
+
+paths:
+  - 'src/**'
+  - 'Makefile'
 
 jobs:
   build:
