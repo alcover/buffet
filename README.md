@@ -310,7 +310,8 @@ Discards *buf*.
 If *buf* was the last reference to owned data, the data is released.  
 
 Returns *true* and zeroes-out *buf* into an empty *SSO* if all good.  
-Returns *false* if not. E.g when *buf* is owning data with live views.
+Returns *true* also on double-free or aliasing.  
+Returns *false* otherwise. E.g when *buf* is owning data with live views.
 
 ```C
 char text[] = "Le grand orchestre";
