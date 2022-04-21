@@ -1,8 +1,12 @@
-on: [push, pull_request]
-
-paths:
-  - 'src/**'
-  - 'Makefile'
+on: 
+  push:
+    paths:
+      - 'src/**'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - 'src/**'
+      - 'Makefile'
 
 jobs:
   build:
