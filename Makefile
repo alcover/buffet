@@ -1,12 +1,12 @@
 # `make dbg=1` to enable asserts
 ifndef dbg
-	debug = -DNDEBUG
+	DEBUG = -DNDEBUG
 endif
 
 CC = gcc
 OPTIM = -O2
 WARN = -Wall -Wextra
-CP = $(CC) -std=c11 $(WARN) -g $(debug)
+CP = $(CC) -std=c11 $(WARN) -g
 CPP = g++ -std=c++2a $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
@@ -22,11 +22,11 @@ check = bin/check
 bench =	bin/bench
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) $(examples) $(bench) #bin/try
+all: $(lib) $(asm) $(check) bin/threadtest $(examples) $(bench)
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
-	@ $(CP) $(OPTIM) -c $< -o $@
+	@ $(CP) $(DEBUG) $(OPTIM) -c $< -o $@
 
 $(asm): $(lib)
 	@ echo make $@
@@ -50,7 +50,6 @@ else
 	@ echo libbenchmark not installed
 endif
 
-
 bin/utilcpp: src/utilcpp.cpp src/utilcpp.h
 	@ echo make $@
 	@ $(CPP) $(OPTIM) -c $< -o $@
@@ -58,6 +57,10 @@ bin/utilcpp: src/utilcpp.cpp src/utilcpp.h
 bin/ex/%: src/ex/%.c $(lib)
 	@ echo make $@
 	@ $(LINK)
+
+bin/threadtest: src/threadtest.c $(lib)
+	@ echo make $@
+	@ $(LINK) -lpthread
 
 bin/%: src/%.c $(lib)
 	@ echo make $@
