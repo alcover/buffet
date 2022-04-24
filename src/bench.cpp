@@ -77,7 +77,7 @@ SPLITJOIN_buffet (benchmark::State& state)
 }
  
 //=============================================================================
-#define APPEND_ITER 10000
+#define APPEND_ITER 100000
 #define APPEND_INIT  \
 	const size_t srclen = state.range(0); \
 	const char *src = repeat(srclen); \

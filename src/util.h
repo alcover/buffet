@@ -137,9 +137,7 @@ joinlen (char** parts, int cnt, const char* sep, size_t seplen)
         }
     }    
 
-    // setlen(&ret, totlen);
     free(lengths);
-
     return ret;
 }
 
