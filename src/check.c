@@ -503,10 +503,10 @@ void danger()
 
 //=============================================================================
 void zero(){
-    assert (!ZERO.ptr.data);
-    assert (!ZERO.ptr.len);
-    assert (!ZERO.ptr.aux);
-    assert (!ZERO.ptr.tag);
+    assert (!BUFFET_ZERO.ptr.data);
+    assert (!BUFFET_ZERO.ptr.len);
+    assert (!BUFFET_ZERO.ptr.aux);
+    assert (!BUFFET_ZERO.ptr.tag);
 }
 
 //=============================================================================

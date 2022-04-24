@@ -18,6 +18,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #define BUFFET_SIZE 16
 #define BUFFET_TAG 2 // bits
 #define BUFFET_SSOMAX (BUFFET_SIZE-2)
+#define BUFFET_ZERO ((Buffet){.fill={0}})
 
 typedef union Buffet {
         

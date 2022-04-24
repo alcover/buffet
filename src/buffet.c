@@ -25,7 +25,7 @@ typedef struct {
 #define STEP (1u<<STEPLOG)
 #define CANARY 0xfacebeac //4207853228
 #define OVERALLOC 2
-#define ZERO ((Buffet){.fill={0}})
+#define ZERO BUFFET_ZERO
 #define DATAOFF offsetof(Store,data)
 #define TAG(buf) ((buf)->sso.tag)
 #define CAP(own) ((size_t)(own)->ptr.aux << STEPLOG)
