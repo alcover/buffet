@@ -1,4 +1,12 @@
-on: [push, pull_request]
+name: CI
+
+on:
+  push:
+    paths:
+      - '**.h'
+      - '**.c'
+      - '**.cpp'
+      - 'Makefile'
 
 jobs:
   build:
@@ -7,13 +15,11 @@ jobs:
       fail-fast: true
       matrix:
         CC: [gcc, clang]
-        OPTIM: [-Og, -O2]
-
+        OPTIM: [-O2]
     env:
       make_options: 'CC=${{ matrix.CC }} OPTIM=${{ matrix.OPTIM }}'
-
     steps:
     - uses: actions/checkout@v2
     - run: make -n $make_options
     - run: make $make_options
-    - run: make check $make_options
+    - run: make check
