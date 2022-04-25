@@ -2,24 +2,22 @@ name: CI
 
 on:
   push:
-    paths:
-      - '**.h'
-      - '**.c'
-      - '**.cpp'
-      - 'Makefile'
+    paths-ignore:
+      - 'README.md'
+      - 'ChangeLog'
 
 jobs:
   build:
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: true
       matrix:
         CC: [gcc, clang]
-        OPTIM: [-O2]
     env:
-      make_options: 'CC=${{ matrix.CC }} OPTIM=${{ matrix.OPTIM }}'
+      make_options: 'CC=${{ matrix.CC }}'
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - run: make -n $make_options
-    - run: make $make_options
-    - run: make check
+    - name: make
+      run: make $make_options
+    - name: make check
+      run: make check
