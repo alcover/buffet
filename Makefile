@@ -10,7 +10,6 @@ CP = $(CC) -std=c11 $(WARN) -g
 CPP = g++ -std=c++2a $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
-$(shell mkdir -p bin)
 $(shell mkdir -p bin/ex)
 
 OBJDUMP := $(shell objdump -v 2>/dev/null)
@@ -38,7 +37,7 @@ endif
 
 $(check): src/check.c $(lib)
 	@ echo make $@
-	@ $(CP) -O0 $^ -o $@
+	@ $(CP) -O0 $^ -o $@ -Wno-unused-function
 # 	@ ./$@
 
 # requires libbenchmark-dev
@@ -61,10 +60,6 @@ bin/ex/%: src/ex/%.c $(lib)
 bin/threadtest: src/threadtest.c $(lib)
 	@ echo make $@
 	@ $(LINK) -lpthread
-
-bin/%: src/%.c $(lib)
-	@ echo make $@
-	@ $(LINK)
 
 check:
 	@ ./$(check)

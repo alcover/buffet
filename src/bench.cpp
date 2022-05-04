@@ -1,25 +1,25 @@
 #include <benchmark/benchmark.h>
 #include "utilcpp.h"
+
 extern "C" {
-	#include "buffet.h"
-	#include "util.h"
-	#include "log.h"
+#include <stdio.h>
+#include "buffet.h"
+#include "util.h"
+#include "log.h"
 }
-//=============================================================================
-const char alpha[] = 
-"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+="
-"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+=";
-const size_t alphalen = sizeof(alpha);
+
+#define alphalen (1024*1024)
+const char *alpha = NULL;
 
 #define SPC " "
 #define SEP SPC 
 const char *sep = SEP;
 
 const char *SPLITME =
-"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
-"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
-"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
-"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "f" SEP "g" SEP "h" SEP \
+"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "fun" SEP "g" SEP "h" SEP \
+"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "fun" SEP "g" SEP "h" SEP \
+"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "fun" SEP "g" SEP "h" SEP \
+"a" SEP "b" SEP "c" SEP "d" SEP "e" SEP "fun" SEP "g" SEP "h" SEP \
 "aa" SEP "bb" SEP "cc" SEP "dd" SEP "ee" SEP "ff" SEP "gg" SEP "hh" SEP \
 "aa" SEP "bb" SEP "cc" SEP "dd" SEP "ee" SEP "ff" SEP "gg" SEP "hh" SEP \
 "aaaa" SEP "bbbb" SEP "cccc" SEP "dddd" SEP \
@@ -31,56 +31,98 @@ const char *SPLITME =
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" SEP "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" SEP \
 "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" SEP "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb" SEP;
 
-static char* repeat(size_t n) {
-    char *ret = malloc(n+1);
-    memset(ret,'A',n); ret[n] = 0;
-    return ret;
-} 
-
 //=============================================================================
+#define GETLEN \
+    const size_t len = state.range(0);\
+    assert (len < alphalen);
+
 static void
 MEMCOPY_plainc (benchmark::State& state) 
 {
-    size_t len = state.range(0);
+    GETLEN
+
     for (auto _ : state) {
-        char* buf = malloc(len+1);
-        // benchmark::DoNotOptimize(buf);
+        char *buf = malloc(len+1);
+        benchmark::DoNotOptimize(buf);
         memcpy(buf, alpha, len);
         benchmark::DoNotOptimize(buf[len] = 0);
+        // assert (!strncmp(buf, alpha, len));
         free(buf);
     }
 }
+
 static void
 MEMCOPY_buffet (benchmark::State& state) 
 {
-    size_t len = state.range(0);
+    GETLEN
+
     for (auto _ : state) {
         Buffet buf = buffet_memcopy(alpha, len);
-        // benchmark::DoNotOptimize(buf);
+        benchmark::DoNotOptimize(buf);
+        // assert (!strncmp(buffet_data(&buf), alpha, len));
         buffet_free(&buf);
     }
 }
+
+//=============================================================================
 static void
 MEMVIEW_cppview (benchmark::State& state) 
 {
-    size_t len = state.range(0);
+    GETLEN
+
     for (auto _ : state) {
         auto buf = string_view(alpha, len);
         benchmark::DoNotOptimize(buf);
-        assert(buf[len-1]==alpha[len-1]);
+        // assert (!strncmp(buf.data(), alpha, len));
     }
 }
+
 static void
 MEMVIEW_buffet (benchmark::State& state) 
 {
-    size_t len = state.range(0);
+    GETLEN
+
     for (auto _ : state) {
         Buffet buf = buffet_memview(alpha, len);
         benchmark::DoNotOptimize(buf);
-        assert(buffet_data(&buf)[len-1]==alpha[len-1]);
-        // buffet_free(&buf);
+        // assert (!strncmp(buffet_data(&buf), alpha, len));
     }
 }
+ 
+//=============================================================================
+#define APPEND_INIT \
+    const size_t initlen = state.range(0);\
+    const size_t appnlen = state.range(1);\
+    assert (initlen+appnlen < alphalen);
+
+static void 
+APPEND_cppstr (benchmark::State& state) 
+{
+    APPEND_INIT
+
+    auto dst = string(alpha, initlen);
+    for (auto _ : state) {
+        string_view more = string_view(alpha+initlen, appnlen);
+        dst += more;
+        benchmark::DoNotOptimize(dst);
+        // assert (!strncmp(dst.data(), alpha, initlen+appnlen));
+    }   
+}
+
+static void 
+APPEND_buffet (benchmark::State& state) 
+{
+    APPEND_INIT
+
+    Buffet dst = buffet_memcopy(alpha, initlen);
+    for (auto _ : state) {
+        benchmark::DoNotOptimize(dst);
+        buffet_append (&dst, alpha+initlen, appnlen);
+        // assert (!strncmp(buffet_data(&dst), alpha, initlen+appnlen));
+    }
+    buffet_free(&dst);
+}
+
 //=============================================================================
 static void 
 SPLITJOIN_plainc (benchmark::State& state) 
@@ -90,7 +132,7 @@ SPLITJOIN_plainc (benchmark::State& state)
         char** parts = split(SPLITME, sep, &cnt);
         const char* ret = join(parts, cnt, sep);
 
-        assert(!strcmp(ret, SPLITME));
+        // assert(!strcmp(ret, SPLITME));
         free(ret);
         for (int i = 0; i < cnt; ++i) free(parts[i]);
         free(parts);
@@ -104,7 +146,7 @@ SPLITJOIN_cppview (benchmark::State& state)
         vector<string_view> parts = split_cppview(SPLITME, sep);
         const char* ret = join_cppview(parts, sep);
 
-        assert(!strcmp(ret, SPLITME));
+        // assert(!strcmp(ret, SPLITME));
         free(ret);
     }
 }
@@ -118,76 +160,59 @@ SPLITJOIN_buffet (benchmark::State& state)
         Buffet back = buffet_join(parts, cnt, sep, strlen(sep));
         const char *ret = buffet_data(&back);
 
-        assert(!strcmp(ret, SPLITME));
+        // assert(!strcmp(ret, SPLITME));
         buffet_free(&back);
         free(parts);
     }
 }
- 
-//=============================================================================
-#define APPEND_ITER 100000
-#define APPEND_INIT  \
-	const size_t srclen = state.range(0); \
-	const char *src = repeat(srclen); \
-	const int iter = APPEND_ITER; \
-	const char *exp = repeat(iter*srclen);
 
-static void 
-APPEND_cpp (benchmark::State& state) 
-{
-	APPEND_INIT
-    // faster and fairer than plain string (Justas Masiulis)
-    string_view srcv = string_view(src, srclen);
-    
-    for (auto _ : state) {
-    	string dst;
-        for (int i=0; i<iter; ++i) dst += srcv;
-        
-        const char *ret = dst.data();
-        benchmark::DoNotOptimize(ret); // useless ?
-        assert(!strcmp(ret, exp));
-    }
-	
-	free(src);
-	free(exp);
-}
-
-static void 
-APPEND_buffet (benchmark::State& state) 
-{
-	APPEND_INIT
-    
-    for (auto _ : state) {
-    	Buffet dst = buffet_new(0);
-        for (int i=0; i<iter; ++i) buffet_append (&dst, src, srclen);
-        
-        const char *ret = buffet_data(&dst);
-        benchmark::DoNotOptimize(ret);
-        assert(!strcmp(ret, exp));
-        buffet_free(&dst);
-    }
-	
-	free(src);
-	free(exp);
-}
 
 //=====================================================================
+#define MEMCOPY(one, two) \
+BENCHMARK(one)->Arg(8); \
+BENCHMARK(two)->Arg(8); \
+BENCHMARK(one)->Arg(32); \
+BENCHMARK(two)->Arg(32); \
+BENCHMARK(one)->Arg(128); \
+BENCHMARK(two)->Arg(128); \
+BENCHMARK(one)->Arg(512); \
+BENCHMARK(two)->Arg(512); \
+BENCHMARK(one)->Arg(2048); \
+BENCHMARK(two)->Arg(2048); \
+BENCHMARK(one)->Arg(8192); \
+BENCHMARK(two)->Arg(8192); \
 
-#define BEG 1
-#define END 64
-#define MUL 8
+#define MEMVIEW(one, two) \
+BENCHMARK(one)->Arg(8); \
+BENCHMARK(two)->Arg(8); \
 
-// BENCHMARK(MEMCOPY_plainc)->RangeMultiplier(4)->Range(1,64);
-// BENCHMARK(MEMCOPY_buffet)->RangeMultiplier(4)->Range(1,64);
+#define APPEND(one, two) \
+BENCHMARK(one)->Args({8,4});\
+BENCHMARK(two)->Args({8,4});\
+BENCHMARK(one)->Args({8,16});\
+BENCHMARK(two)->Args({8,16});\
+BENCHMARK(one)->Args({24,4});\
+BENCHMARK(two)->Args({24,4});\
+BENCHMARK(one)->Args({24,32});\
+BENCHMARK(two)->Args({24,32});\
 
-BENCHMARK(MEMVIEW_cppview)->RangeMultiplier(4)->Range(1,16);
-BENCHMARK(MEMVIEW_buffet)->RangeMultiplier(4)->Range(1,16);
+MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
+MEMVIEW (MEMVIEW_cppview, MEMVIEW_buffet);
+APPEND (APPEND_cppstr, APPEND_buffet);
 
-// BENCHMARK(SPLITJOIN_plainc);
-// BENCHMARK(SPLITJOIN_cppview);
-// BENCHMARK(SPLITJOIN_buffet);
+BENCHMARK(SPLITJOIN_plainc);
+BENCHMARK(SPLITJOIN_cppview);
+BENCHMARK(SPLITJOIN_buffet);
 
-// BENCHMARK(APPEND_cpp)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
-// BENCHMARK(APPEND_buffet)->RangeMultiplier(MUL)->Range(BEG,END)->Unit(benchmark::kMicrosecond);
 
-BENCHMARK_MAIN();
+// BENCHMARK_MAIN();
+int main(int argc, char** argv)
+{
+    alpha = repeat(ALPHA64, alphalen);
+
+    ::benchmark::Initialize(&argc, argv);
+    ::benchmark::RunSpecifiedBenchmarks();
+
+    // fgetc(stdin);
+    free(alpha);
+}

@@ -1,5 +1,9 @@
 #include <stdio.h>
 
+#define ALPHA64 \
+"0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ+="
+
+
 #define BENCHBEG \
 struct timespec start, stop; \
 clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &start);
@@ -9,6 +13,16 @@ clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &stop); \
 double time = ((double)(stop.tv_nsec - start.tv_nsec)) / 1000000L; \
 printf("%s %.3f ms\n", #title, time);
 
+static char* 
+repeat (const char *pat, int totlen) {
+    int patlen = strlen(pat);
+    int n = totlen/patlen;
+    char *ret = calloc(totlen+1, 1);
+    for (int i = 0; i < n; ++i) strcat(ret, pat);
+    strncat(ret, pat, totlen%patlen);
+    // ret[len] = 0;
+    return ret;
+} 
 
 static const char*
 load (const char* src_path, size_t* outlen)

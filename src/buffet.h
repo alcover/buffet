@@ -9,34 +9,40 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include <assert.h>
 
 #ifndef BUFFET_STACK_MEM
 #define BUFFET_STACK_MEM 1024
 #endif
 
-// Do not touch
-#define BUFFET_SIZE 16
-#define BUFFET_TAG 2 // bits
-#define BUFFET_SSOMAX (BUFFET_SIZE-2)
-#define BUFFET_ZERO ((Buffet){.fill={0}})
+#define TAGBITS 2
+
+typedef struct {
+    char*  data;
+    size_t len;
+    size_t aux:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;
+} BuffetPtr;
+
+typedef struct {
+    char    data[sizeof(BuffetPtr)-1];
+    uint8_t len:8-TAGBITS, tag:TAGBITS;
+} BuffetSSO;
 
 typedef union Buffet {
-        
-    char fill[BUFFET_SIZE];
-
-    struct {
-        char*    data;
-        uint32_t len;
-        uint32_t aux:32-BUFFET_TAG, tag:BUFFET_TAG;
-    } ptr;
-
-    struct {
-        char     data[BUFFET_SIZE-1];
-        uint8_t  len:8-BUFFET_TAG, tag:BUFFET_TAG;
-    } sso;
- 
+    BuffetPtr ptr;
+    BuffetSSO sso; 
+    char fill[sizeof(BuffetPtr)];
 } Buffet;
 
+static_assert (sizeof(BuffetPtr) == sizeof(char*) + 2*sizeof(size_t), 
+    "BuffetPtr not packed");
+static_assert (sizeof(Buffet) == sizeof(BuffetPtr), 
+    "Buffet not packed");
+
+#undef TAGBITS
+
+#define BUFFET_ZERO ((Buffet){.fill={0}})
+#define BUFFET_SSOMAX (sizeof(((BuffetSSO){0}).data)-1)
 
 #ifdef __cplusplus
 extern "C" {

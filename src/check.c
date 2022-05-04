@@ -4,12 +4,11 @@
 #include <assert.h>
 #include "buffet.h"
 #include "log.h"
+#include "util.h"
 
-const char alpha[] = 
-"0000000011111111222222223333333344444444555555556666666677777777"
-"8888888899999999aaaaaaaabbbbbbbbccccccccddddddddeeeeeeeeffffffff";
-const size_t alphalen = sizeof(alpha);
-char tmp[sizeof(alpha)+1];
+#define alphalen 1024*1024
+const char *alpha;
+char tmp[alphalen+1];
 
 // put a slice of alpha into tmp
 static char* take (size_t off, size_t len) {
@@ -80,7 +79,7 @@ void new()
     unew (1);
     unew (8);
     around (unew, BUFFET_SSOMAX);
-    around (unew, BUFFET_SIZE);
+    around (unew, sizeof(Buffet));
     around (unew, 32);
     around (unew, 64);
     around (unew, 1024);
@@ -510,22 +509,33 @@ void zero(){
 }
 
 //=============================================================================
+#define GREEN "\033[32;1m"
+#define RESET "\033[0m"
+
+#define run(name) { \
+    printf("%-12s ", #name); fflush(stdout);\
+    name(); \
+    LOG(GREEN "OK" RESET); \
+}
+
 int main()
 {
     LOG("unit tests... ");
 
-    zero();
-    new();
-    memcopy();
-    memview();
-    copy();
-    clone();
-    view();
-    append();
-    splitjoin();
-    free_();
-    danger();
+    alpha = repeat(ALPHA64, alphalen);
+
+    run(zero);
+    run(new);
+    run(memcopy);
+    run(memview);
+    run(copy);
+    run(view);
+    run(clone);
+    run(append);
+    run(splitjoin);
+    run(free_);
+    run(danger);
     
-    LOG("unit tests OK");
+    LOG(GREEN "unit tests OK" RESET);
     return 0;
 }
