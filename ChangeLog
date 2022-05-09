@@ -1,3 +1,11 @@
+2022-05-04  alco
+	
+	v0.6.0
+	
+	* NEW LAYOUT: 24 bytes type with size_t capacity
+
+	* micro bench
+
 2022-04-20  alco
 	
 	v0.5.2

@@ -6,7 +6,7 @@
 #include "log.h"
 #include "util.h"
 
-#define alphalen 1024*1024
+#define alphalen 1024/2
 const char *alpha;
 char tmp[alphalen+1];
 
@@ -146,61 +146,54 @@ void clone() {
 }
 
 //=============================================================================
-
-#define uview(srclen, off, len) { \
-    Buffet src = buffet_memcopy (alpha, srclen); \
+#define viewcheck(src, srclen, off, len) \
     Buffet view = buffet_view (&src, off, len); \
-    check(view, off, len); \
+    size_t explen = len; \
+    if (off>=srclen) explen = 0; \
+    else if (off+len>=srclen) explen = srclen-off; \
+    assert_int (buffet_len(&view), explen); \
+    assert_stn (buffet_data(&view), alpha+off, explen); \
     buffet_free(&view); \
-    buffet_free(&src); \
-}
-
-void uview_ref (size_t srclen, size_t off, size_t len)
-{
-    Buffet buf = buffet_memcopy (alpha, alphalen);
-    Buffet src = buffet_view (&buf, 0, srclen);
-    Buffet view = buffet_view (&src, off, len);
-
-    check(view, off, len);
-    
-    buffet_free(&view);
     buffet_free(&src);
-    buffet_free(&buf);
+
+#define uview_own(srclen, off, len) { \
+    Buffet src = buffet_memcopy (alpha, srclen); \
+    viewcheck(src, srclen, off, len) \
 }
 
-void uview_vue (size_t off, size_t len)
-{
-    Buffet vue = buffet_memview (alpha, alphalen);
-    Buffet view = buffet_view (&vue, off, len);
-
-    check(view, off, len);
-
-    buffet_free(&view);
-    buffet_free(&vue);
+#define uview_ref(srclen, off, len) { \
+    Buffet buf = buffet_memcopy (alpha, alphalen); \
+    Buffet src = buffet_view (&buf, 0, srclen); \
+    viewcheck(src, srclen, off, len) \
+    buffet_free(&buf); \
 }
 
-void view()
-{
-    uview (8, 0, 0);
-    uview (8, 0, 4);
-    uview (8, 0, 8);
-    uview (8, 2, 4);
-    uview (8, 2, 6);
+#define uview_vue(srclen, off, len) { \
+    Buffet src = buffet_memview (alpha, srclen); \
+    viewcheck(src, srclen, off, len) \
+}
 
-    uview (40, 0, 0);
-    uview (40, 0, 20);
-    uview (40, 0, 40);
-    uview (40, 20, 10);
-    uview (40, 20, 20);
+#define VIEWCASES(fun, srclen)\
+fun (srclen, 0, 0); \
+fun (srclen, 0, srclen/2);  /* part */ \
+fun (srclen, 0, srclen);    /* full */ \
+fun (srclen, 0, srclen+1);  /* beyond */ \
+fun (srclen, 2, srclen/2);  /* part */ \
+fun (srclen, 2, srclen-2);  /* till end */ \
+fun (srclen, 2, srclen+1);  /* beyond */ \
+fun (srclen, srclen, 0);    /* bad off */ \
+fun (srclen, srclen, 1);    /* bad off */ \
+fun (srclen, srclen+1, 0);  /* bad off */ \
+fun (srclen, srclen+1, 1);  /* bad off */ \
 
-    uview_ref (40, 0, 0);
-    uview_ref (40, 0, 20);
-    uview_ref (40, 0, 40);
-    uview_ref (40, 20, 10);
-    uview_ref (40, 20, 20);
-
-    uview_vue (0, 8);
-    uview_vue (0, 40);
+void view() {
+    uview_own (0, 0, 0);
+    VIEWCASES (uview_own, 8) // sso
+    VIEWCASES (uview_own, 60) // own
+    VIEWCASES (uview_ref, 8)
+    VIEWCASES (uview_ref, 60)
+    VIEWCASES (uview_vue, 8)
+    VIEWCASES (uview_vue, 60)
 }
 
 //=============================================================================
@@ -290,7 +283,7 @@ void append()
     uappend_memview (8, 8);
     uappend_memview (8, 20);
     uappend_memview (20, 20);
-
+// bad refcnts??
     uappend_view (8, 4);
     uappend_view (8, 20);
     uappend_view (20, 20);

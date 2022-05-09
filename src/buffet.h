@@ -35,9 +35,9 @@ typedef union Buffet {
 } Buffet;
 
 static_assert (sizeof(BuffetPtr) == sizeof(char*) + 2*sizeof(size_t), 
-    "BuffetPtr not packed");
+    "BuffetPtr size");
 static_assert (sizeof(Buffet) == sizeof(BuffetPtr), 
-    "Buffet not packed");
+    "Buffet size");
 
 #undef TAGBITS
 
