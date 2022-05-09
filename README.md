@@ -11,9 +11,8 @@ Buffet is an experimental polymorphic string buffer with
 - **SSO** (small string optimization)
 - **views** : no-copy references to slices of data  
 - **refcount** : secure release of owned data
-- 4GB max length (possibly 16)
 
-It is compact (**16 bytes**), reasonably [**fast**](#Speed) and aims at total [**security**](#Security).  
+It aims at total [**security**](#Security) with decent [**speed**](#Speed).  
 Coming: thread safety
 
 ---
@@ -21,19 +20,20 @@ Coming: thread safety
 ## How
 
 ```C
+// Hard values illustrate running on 64-bit
 union Buffet {
         
     // OWN|REF|VUE
     struct {
-        char*    data
-        uint32_t len
-        uint32_t aux:30, 2 // aux = cap|off
+        char*  data
+        size_t len
+        size_t aux:62, tag:2 // aux = cap|off
     } ptr
 
     // SSO
     struct {
-        char     data[15]
-        uint8_t  len:6, 2
+        char    data[23]
+        uint8_t len:6, tag:2
     } sso
 }
 ```  
@@ -96,19 +96,35 @@ While extensive, tests may not yet cover *all* cases.
 (requires *libbenchmark-dev*)  
 
 NB: No effort has yet been done on optimization.  
-NB: Bench is amateurish, maybe unfair.
+NB: Bench is maybe unfair.
 
-On my weak Thinkpad :  
+On a weak Thinkpad :  
 ```
-SPLITJOIN_cppView       3492 ns
-SPLITJOIN_plainC        2923 ns
-SPLITJOIN_buffet        1380 ns
-APPEND_cpp/1              26 us
-APPEND_cpp/8              86 us
-APPEND_cpp/64            668 us
-APPEND_buffet/1           74 us
-APPEND_buffet/8           87 us
-APPEND_buffet/64         132 us
+MEMCOPY_plainc/8            18 ns
+MEMCOPY_buffet/8            19 ns
+MEMCOPY_plainc/32           18 ns
+MEMCOPY_buffet/32           27 ns
+MEMCOPY_plainc/128          21 ns
+MEMCOPY_buffet/128          29 ns
+MEMCOPY_plainc/512          30 ns
+MEMCOPY_buffet/512          41 ns
+MEMCOPY_plainc/2048         80 ns
+MEMCOPY_buffet/2048        102 ns
+MEMCOPY_plainc/8192        205 ns
+MEMCOPY_buffet/8192        282 ns
+MEMVIEW_cppview/8            1 ns
+MEMVIEW_buffet/8             7 ns
+APPEND_cppstr/8/4            8 ns
+APPEND_buffet/8/4           12 ns
+APPEND_cppstr/8/16          12 ns
+APPEND_buffet/8/16          13 ns
+APPEND_cppstr/24/4           7 ns
+APPEND_buffet/24/4          12 ns
+APPEND_cppstr/24/32         30 ns
+APPEND_buffet/24/32         18 ns
+SPLITJOIN_plainc          3213 ns
+SPLITJOIN_cppview         3294 ns
+SPLITJOIN_buffet          1516 ns
 ```
 
 
@@ -217,7 +233,8 @@ buffet_debug(&copy);
 Buffet buffet_memview (const char *src, size_t len)
 ```
 Create a new Buffet viewing *len* bytes from *src*.  
-You get a window into *src* without copy or allocation.
+You get a window into *src* without copy or allocation.  
+NB: You shouldn't directly *memview* a Buffet's *data*. Use *view()*
 
 ```C
 char src[] = "Eat Buffet!";

@@ -88,38 +88,9 @@ new_vue (const char *src, size_t len)
     return (Buffet) {
         .ptr.data = (char*)src,
         .ptr.len = len,
-        // .ptr.aux = 0,
+        .ptr.aux = 0,
         .ptr.tag = VUE
     };
-}
-
-
-static char*
-grow_sso (Buffet *buf, size_t newcap)
-{
-    Buffet own = new_own (newcap, buf->sso.data, buf->sso.len);
-    char *data = own.ptr.data;
-    if (data) *buf = own;
-
-    return data;
-}
-
-
-static char*
-grow_own (Buffet *buf, size_t newcap)
-{
-    Store *store = getstore(buf);
-
-    if (store->canary != CANARY) {ERR_CANARY; return NULL;}
-    
-    store = realloc(store, DATAOFF + newcap + 1);
-    if (!store) return NULL;
-    char *data = store->data;
-
-    DATA(buf) = data;
-    buf->ptr.aux = newcap;
-
-    return data;
 }
 
 
@@ -127,9 +98,34 @@ static char*
 grow (Buffet *buf, size_t newcap)
 {
     Tag tag = TAG(buf);
-    assert(tag==SSO||tag==OWN);
+    char *data = NULL;
 
-    return tag==SSO ? grow_sso(buf, newcap) : grow_own(buf, newcap);
+    if (tag==SSO) {
+
+        Buffet own = new_own (newcap, buf->sso.data, buf->sso.len);
+        data = own.ptr.data;
+        if (data) *buf = own;
+
+    } else {
+
+        assert(tag==OWN);
+
+        Store *store = getstore(buf);
+
+        if (store->canary != CANARY) {
+            ERR_CANARY; 
+            return NULL;
+        }
+        
+        store = realloc(store, DATAOFF + newcap + 1);
+        if (store) {
+            data = store->data;
+            DATA(buf) = data;
+            buf->ptr.aux = newcap;
+        }
+    }
+    
+    return data;
 }
 
 

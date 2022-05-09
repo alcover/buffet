@@ -2,9 +2,10 @@
 	
 	v0.6.0
 	
-	* NEW LAYOUT: 24 bytes type with size_t capacity
+	* NEW LAYOUT: use size_t capacity instead of hard-coded bit-length.
+	This makes Buffet a 24 bytes type on 64 bit.
 
-	* micro bench
+	* introduce micro-benchmarking for future fine-tuning
 
 2022-04-20  alco
 	

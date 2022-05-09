@@ -52,7 +52,7 @@ extern "C" {
 Buffet  buffet_new (size_t cap);
 Buffet  buffet_memcopy (const char *src, size_t len);
 Buffet  buffet_memview (const char *src, size_t len);
-Buffet  buffet_dup (const Buffet *src);
+Buffet  buffet_dup  (const Buffet *src);
 Buffet  buffet_copy (const Buffet *src, ptrdiff_t off, size_t len);
 Buffet  buffet_view (Buffet *src, ptrdiff_t off, size_t len);
 Buffet  buffet_join (const Buffet *list, int cnt, 

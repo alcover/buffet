@@ -38,7 +38,7 @@ endif
 $(check): src/check.c $(lib)
 	@ echo make $@
 	@ $(CP) -O0 $^ -o $@ -Wno-unused-function
-	@ ./$@
+# 	@ ./$@
 
 # requires libbenchmark-dev
 $(bench): src/bench.cpp $(lib) bin/utilcpp
