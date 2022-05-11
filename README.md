@@ -38,10 +38,10 @@ union Buffet {
 }
 ```  
 The *tag* sets how Buffet is interpreted :
-- `SSO` : as in-situ char array
-- `OWN` : as owning heap-allocated data (*aux* = capacity)
-- `REF` : as slice of owned data (*aux* = offset)
-- `VUE` : as slice of other data
+- `SSO` : in-situ char array
+- `OWN` : owning heap-allocated data (*aux* = capacity)
+- `REF` : slice of owned data (*aux* = offset)
+- `VUE` : slice of other data
 
 Any proper data (*SSO*/*OWN*) is null-terminated.  
 
@@ -210,9 +210,9 @@ Buffet buffet_new (size_t cap)
 Create a new Buffet of minimum capacity *cap*.  
 
 ```C
-Buffet buf = buffet_new(20);
+Buffet buf = buffet_new(40);
 buffet_debug(&buf); 
-// OWN cap:20 len:0 cstr:''
+// OWN cap:40 len:0 cstr:''
 ```
 
 ### buffet_memcopy

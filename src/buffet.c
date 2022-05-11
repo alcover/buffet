@@ -236,10 +236,10 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
         // (SSO refcnt was tested and seemed too slow and branchy)
         // todo: implications
         //   ex: if SSO had a VUE on it through `view(sso.data)`
-        //      warn bad practice ? user should `view(sso)`
+        //       warn bad practice ? user should `view(sso)`
         
         Buffet own = new_own (srclen, src->sso.data, srclen);
-        if (!own.ptr.data) return ZERO; //?
+        if (!own.ptr.data) return ZERO;
         *src = own;
     
     } else if (tag==REF) {
@@ -249,9 +249,11 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
     }
 
     Store *store = getstore(src);
+
     if (store->canary != CANARY) { //todo useless for sso
         ERR_CANARY; return ZERO;
     }
+
     ++ store->refcnt; 
 
     return (Buffet) {

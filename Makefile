@@ -12,9 +12,6 @@ LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin/ex)
 
-OBJDUMP := $(shell objdump -v 2>/dev/null)
-LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
-
 lib = bin/buffet
 asm = bin/buffet.s
 check = bin/check
@@ -26,6 +23,8 @@ all: $(lib) $(asm) $(check) bin/threadtest $(examples) $(bench)
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
 	@ $(CP) $(DEBUG) $(OPTIM) -c $< -o $@
+
+OBJDUMP := $(shell objdump -v 2>/dev/null)
 
 $(asm): $(lib)
 	@ echo make $@
@@ -39,6 +38,8 @@ $(check): src/check.c $(lib)
 	@ echo make $@
 	@ $(CP) -O0 $^ -o $@ -Wno-unused-function
 # 	@ ./$@
+
+LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 
 # requires libbenchmark-dev
 $(bench): src/bench.cpp $(lib) bin/utilcpp
