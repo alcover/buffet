@@ -69,6 +69,7 @@ void check_export (Buffet *buf, size_t off, size_t len) {
 //=============================================================================
 void unew (size_t cap) {
     Buffet buf = buffet_new(cap); 
+    // buffet_debug(&buf);
     check(buf, 0, 0);
     buffet_free(&buf); 
 }
@@ -283,7 +284,7 @@ void append()
     uappend_memview (8, 8);
     uappend_memview (8, 20);
     uappend_memview (20, 20);
-// bad refcnts??
+
     uappend_view (8, 4);
     uappend_view (8, 20);
     uappend_view (20, 20);
@@ -435,12 +436,33 @@ void view_after_reloc (size_t initlen)
     Buffet ref = buffet_view (&src, 0, initlen);
 
     buffet_append (&src, alpha, alphalen);
-    // buffet_debug(&ref);
     check(ref, 0, initlen);
     
     buffet_free(&ref); 
-    // buffet_debug(&src);
     buffet_free(&src);    
+}
+
+void view_after_free (size_t initlen)
+{
+    Buffet src = buffet_memcopy (alpha, initlen);
+    Buffet ref = buffet_view (&src, 0, initlen);
+
+    buffet_free(&src);    
+    check(ref, 0, initlen);
+    
+    buffet_free(&ref); 
+}
+
+void view_alias_after_free (size_t initlen)
+{
+    Buffet src = buffet_memcopy (alpha, initlen);
+    Buffet alias = src;
+    buffet_free(&src);    
+    Buffet ref = buffet_view (&alias, 0, initlen);
+
+    check(ref, 0, 0);
+    
+    buffet_free(&ref); 
 }
 
 void append_view_after_reloc (size_t initlen, size_t len)
@@ -488,17 +510,30 @@ void danger()
 
     view_after_reloc(8);
 
+    view_after_free(8);
+    view_after_free(40);
+
+    // view_alias_after_free(8); // useless.. SSO is copy
+    view_alias_after_free(40);
+
     append_view_after_reloc(8,4);
     append_view_after_reloc(8,20);
     append_view_after_reloc(20,20);
 }
 
 //=============================================================================
-void zero(){
-    assert (!BUFFET_ZERO.ptr.data);
-    assert (!BUFFET_ZERO.ptr.len);
-    assert (!BUFFET_ZERO.ptr.aux);
-    assert (!BUFFET_ZERO.ptr.tag);
+void zero()
+{
+    Buffet buf = BUFFET_ZERO;
+
+    assert (!buf.ptr.data);
+    assert (!buf.ptr.len);
+    assert (!buf.ptr.aux);
+    assert (!buf.ptr.tag);
+
+    assert (!strcmp(buf.sso.data, ""));
+    assert (!buf.sso.len);
+    assert (!buf.sso.tag);
 }
 
 //=============================================================================

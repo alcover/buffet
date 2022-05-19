@@ -20,15 +20,18 @@ typedef struct {
     char     data[];
 } Store;
 
-#define CANARY 0xfacebeac //4207853228
-#define OVERALLOC 2
+#define CANARY 0xaaaaaaaa   // prevents accessing stale data
+#define OVERALLOC 2         // growth factor
 #define ZERO BUFFET_ZERO
 #define DATAOFF offsetof(Store,data)
 #define TAG(buf) ((buf)->sso.tag)
-#define DATA(own) ((own)->ptr.data)
-#define CAP(own) ((own)->ptr.aux)   
-#define OFF(ref) ((ref)->ptr.aux)
-#define TARGET(ref) ((Buffet*)DATA(ref))
+#define DATA(buf) ((buf)->ptr.data)
+#define CAP(buf) ((buf)->ptr.aux)   
+#define OFF(buf) ((buf)->ptr.aux)
+#define TARGET(buf) ((Buffet*)DATA(buf))
+#define STORE(buf) (Store*)(DATA(buf)-DATAOFF)
+#define MEM(cap) (DATAOFF+cap+1)
+#define ERASE(buf) memset(buf, 0, sizeof(Buffet))
 
 #define ERR_ALLOC ERR("Failed allocation\n")
 #define ERR_CANARY WARN("Bad canary. Double free ?\n")
@@ -44,26 +47,19 @@ getdata (const Buffet *buf, Tag tag) {
 
 static size_t
 getlen (const Buffet *buf, Tag tag) {
-    return tag ? buf->ptr.len : buf->sso.len;
+    return tag==SSO ? buf->sso.len : buf->ptr.len;
 }
 
 static void 
 setlen (Buffet *buf, size_t len, Tag tag) {
-    if (tag) buf->ptr.len = len; else buf->sso.len = len;
-}
-
-static Store*
-getstore (const Buffet *own) {
-    assert (TAG(own)==OWN);
-    return (Store*)(DATA(own) - DATAOFF);
+    if (tag==SSO) buf->sso.len = len; else buf->ptr.len = len;
 }
 
 
-// todo: refactor ? bool success ?
 static Buffet
 new_own (size_t cap, const char *src, size_t len)
 {
-    Store *store = malloc(DATAOFF + cap + 1);
+    Store *store = malloc(MEM(cap));
 
     if (!store) {ERR_ALLOC; return ZERO;}
 
@@ -110,14 +106,14 @@ grow (Buffet *buf, size_t newcap)
 
         assert(tag==OWN);
 
-        Store *store = getstore(buf);
+        Store *store = STORE(buf);
 
         if (store->canary != CANARY) {
             ERR_CANARY; 
             return NULL;
         }
         
-        store = realloc(store, DATAOFF + newcap + 1);
+        store = realloc(store, MEM(newcap));
         if (store) {
             data = store->data;
             DATA(buf) = data;
@@ -205,7 +201,7 @@ buffet_dup (const Buffet *src)
     
     } else if (tag==REF) { 
     
-        Store *store = getstore(TARGET(src));
+        Store *store = STORE(TARGET(src));
         if (store->canary != CANARY) {ERR_CANARY; return ZERO;}
         ++ store->refcnt;
     }
@@ -248,9 +244,9 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
         src = TARGET(src);
     }
 
-    Store *store = getstore(src);
+    Store *store = STORE(src);
 
-    if (store->canary != CANARY) { //todo useless for sso
+    if (tag==OWN && store->canary != CANARY) {
         ERR_CANARY; return ZERO;
     }
 
@@ -265,7 +261,6 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
 }
 
 
-// todo want_free() ?
 bool
 buffet_free (Buffet *buf)
 {   
@@ -273,7 +268,7 @@ buffet_free (Buffet *buf)
 
     if (tag==OWN) {
             
-        Store *store = getstore(buf);
+        Store *store = STORE(buf);
 
         if (store->canary != CANARY) {
             ERR_CANARY;
@@ -292,7 +287,7 @@ buffet_free (Buffet *buf)
     } else if (tag==REF) {
     
         Buffet *target = TARGET(buf);            
-        Store *store = getstore(target);
+        Store *store = STORE(target);
      
         if (store->canary != CANARY) {
             ERR_CANARY;
@@ -304,12 +299,12 @@ buffet_free (Buffet *buf)
                 // LOG("free ref : rid store");
                 store->canary = 0;
                 free(store);
-                *target = ZERO;                
+                ERASE(target);             
             }
         }
     }
 
-    *buf = ZERO;
+    ERASE(buf);
     return true;
 }
 
@@ -360,16 +355,16 @@ buffet_append (Buffet *buf, const char *src, size_t srclen)
         if (tag==REF) {
 
             Buffet *target = TARGET(buf);
-            Store *store = getstore(target);
+            Store *store = STORE(target);
             
             // if invalid ref, erase it
             if (store->canary != CANARY) {
                 ERR_CANARY;
-                *buf = ZERO; // then append ?
+                ERASE(buf); // then append ?
                 return 0;
             } else if (!store->refcnt) {
                 ERR_REFCNT;
-                *buf = ZERO; // then append ?
+                ERASE(buf); // then append ?
                 return 0;
             } else { 
                 -- store->refcnt;

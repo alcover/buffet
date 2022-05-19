@@ -196,16 +196,13 @@ BENCHMARK(two)->Args({24,4});\
 BENCHMARK(one)->Args({24,32});\
 BENCHMARK(two)->Args({24,32});\
 
-MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
 MEMVIEW (MEMVIEW_cppview, MEMVIEW_buffet);
+MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
 APPEND (APPEND_cppstr, APPEND_buffet);
-
 BENCHMARK(SPLITJOIN_plainc);
 BENCHMARK(SPLITJOIN_cppview);
 BENCHMARK(SPLITJOIN_buffet);
 
-
-// BENCHMARK_MAIN();
 int main(int argc, char** argv)
 {
     alpha = repeat(ALPHA64, alphalen);

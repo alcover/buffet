@@ -11,6 +11,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include <stdbool.h>
 #include <assert.h>
 
+// max stack allocation for split()
 #ifndef BUFFET_STACK_MEM
 #define BUFFET_STACK_MEM 1024
 #endif
