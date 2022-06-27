@@ -11,38 +11,33 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include "buffet.h"
 #include "log.h"
 
-typedef enum {SSO=0, OWN, REF, VUE} Tag;
+typedef enum {SSO=0, OWN, VUE} Tag;
 
 typedef struct {
+    size_t   cap;
+    char*    end; // for append in place
     uint32_t refcnt;
     volatile
     uint32_t canary;
-    char     data[];
+    char     data[1];
 } Store;
 
-#define CANARY 0xaaaaaaaa   // prevents accessing stale data
+#define CANARY 0xbeacface   // prevents accessing stale data
 #define OVERALLOC 2         // growth factor
 #define ZERO BUFFET_ZERO
 #define DATAOFF offsetof(Store,data)
 #define TAG(buf) ((buf)->sso.tag)
-#define DATA(buf) ((buf)->ptr.data)
-#define CAP(buf) ((buf)->ptr.aux)   
-#define OFF(buf) ((buf)->ptr.aux)
-#define TARGET(buf) ((Buffet*)DATA(buf))
-#define STORE(buf) (Store*)(DATA(buf)-DATAOFF)
-#define MEM(cap) (DATAOFF+cap+1)
+#define MEM(cap) (DATAOFF+cap+1) // space for a store of capacity `cap`
 #define ERASE(buf) memset(buf, 0, sizeof(Buffet))
 
 #define ERR_ALLOC ERR("Failed allocation\n")
 #define ERR_CANARY WARN("Bad canary. Double free ?\n")
 #define ERR_REFCNT WARN("Bad refcnt. Rogue alias ?\n")
+#define ERR_SHARED WARN("Shared store\n")
 
-static const char*
+static char*
 getdata (const Buffet *buf, Tag tag) {
-    return
-    tag==SSO ? buf->sso.data :
-    tag==REF ? DATA(TARGET(buf)) + OFF(buf) :
-    DATA(buf);
+    return tag==SSO ? (char*)buf->sso.data : buf->ptr.data;
 }
 
 static size_t
@@ -55,73 +50,57 @@ setlen (Buffet *buf, size_t len, Tag tag) {
     if (tag==SSO) buf->sso.len = len; else buf->ptr.len = len;
 }
 
+static inline Store*
+getstore (const Buffet *buf) {
+    return (Store*)(buf->ptr.data - buf->ptr.off - DATAOFF);
+}
+
+
+static inline Store*
+new_store (size_t cap, size_t len)
+{
+    Store *store = malloc(MEM(cap));
+    if (!store) {ERR_ALLOC; return NULL;}
+
+    *store = (Store){
+        .cap = cap,
+        .end = store->data + len,
+        .refcnt = 1, 
+        .canary = CANARY,
+    };
+
+    return store;
+}
+
 
 static Buffet
 new_own (size_t cap, const char *src, size_t len)
 {
-    Store *store = malloc(MEM(cap));
-
-    if (!store) {ERR_ALLOC; return ZERO;}
-
-    *store = (Store){.refcnt=1, .canary=CANARY};
+    Store *store = new_store(cap, len);
+    if (!store) {return ZERO;}
 
     char *data = store->data;
-    if (src) memcpy(data, src, len);
+    memcpy(data, src, len);
     data[len] = 0;
 
     return (Buffet) {
         .ptr.data = data,
         .ptr.len = len,
-        .ptr.aux = cap,
+        .ptr.off = 0,
         .ptr.tag = OWN
     };
 }
 
 
-static Buffet
+static inline Buffet
 new_vue (const char *src, size_t len)
 {
     return (Buffet) {
         .ptr.data = (char*)src,
         .ptr.len = len,
-        .ptr.aux = 0,
+        .ptr.off = 0,
         .ptr.tag = VUE
     };
-}
-
-
-static char*
-grow (Buffet *buf, size_t newcap)
-{
-    Tag tag = TAG(buf);
-    char *data = NULL;
-
-    if (tag==SSO) {
-
-        Buffet own = new_own (newcap, buf->sso.data, buf->sso.len);
-        data = own.ptr.data;
-        if (data) *buf = own;
-
-    } else {
-
-        assert(tag==OWN);
-
-        Store *store = STORE(buf);
-
-        if (store->canary != CANARY) {
-            ERR_CANARY; 
-            return NULL;
-        }
-        
-        store = realloc(store, MEM(newcap));
-        if (store) {
-            data = store->data;
-            DATA(buf) = data;
-            buf->ptr.aux = newcap;
-        }
-    }
-    
-    return data;
 }
 
 
@@ -132,7 +111,6 @@ dbg (const Buffet* buf)
     switch(TAG(buf)) {
         case SSO: sprintf(tag,"SSO"); break;
         case OWN: sprintf(tag,"OWN"); break;
-        case REF: sprintf(tag,"REF"); break;
         case VUE: sprintf(tag,"VUE"); break;
     }
 
@@ -152,7 +130,18 @@ dbg (const Buffet* buf)
 Buffet
 buffet_new (size_t cap)
 {
-    return (cap <= BUFFET_SSOMAX) ? ZERO : new_own(cap, NULL, 0);
+    if (cap <= BUFFET_SSOMAX) {
+        return ZERO;
+    } else {
+        Store *store = new_store(cap, 0);
+        if (!store) return ZERO;
+        return (Buffet) {
+            .ptr.data = store->data,
+            .ptr.len = 0,
+            .ptr.off = 0,
+            .ptr.tag = OWN
+        };
+    }
 }
 
 
@@ -197,13 +186,7 @@ buffet_dup (const Buffet *src)
     if (tag==OWN) {
 
         size_t len = src->ptr.len;
-        return new_own (len, DATA(src), len); // or inc rc, ret src + cow?
-    
-    } else if (tag==REF) { 
-    
-        Store *store = STORE(TARGET(src));
-        if (store->canary != CANARY) {ERR_CANARY; return ZERO;}
-        ++ store->refcnt;
+        return new_own (len, src->ptr.data, len); // or inc rc, ret src + cow?
     }
 
     return *src;
@@ -213,7 +196,7 @@ buffet_dup (const Buffet *src)
 Buffet
 buffet_view (Buffet *src, ptrdiff_t off, size_t len)
 {
-    if (!len) return ZERO;
+    // if (!len) return ZERO;
 
     Tag tag = TAG(src);
     size_t srclen = getlen(src,tag);
@@ -223,7 +206,7 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
     if (off+len > srclen) len = srclen-off;
 
     if (tag==VUE) {
-        return new_vue (DATA(src) + off, len); 
+        return new_vue (src->ptr.data + off, len); //?
     }
 
     if (tag==SSO) {
@@ -237,26 +220,21 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
         Buffet own = new_own (srclen, src->sso.data, srclen);
         if (!own.ptr.data) return ZERO;
         *src = own;
-    
-    } else if (tag==REF) {
-    
-        off += OFF(src);
-        src = TARGET(src);
     }
 
-    Store *store = STORE(src);
+    Store *store = getstore(src);
 
-    if (tag==OWN && store->canary != CANARY) {
+    if (store->canary != CANARY) {
         ERR_CANARY; return ZERO;
     }
 
     ++ store->refcnt; 
 
     return (Buffet) {
-        .ptr.data = (char*)(src),
+        .ptr.data = src->ptr.data + off,
         .ptr.len = len,
-        .ptr.aux = off,
-        .ptr.tag = REF     
+        .ptr.off = src->ptr.off + off,
+        .ptr.tag = OWN     
     };              
 }
 
@@ -268,7 +246,7 @@ buffet_free (Buffet *buf)
 
     if (tag==OWN) {
             
-        Store *store = STORE(buf);
+        Store *store = getstore(buf);
 
         if (store->canary != CANARY) {
             ERR_CANARY;
@@ -283,25 +261,6 @@ buffet_free (Buffet *buf)
                 return false;
             }
         }
-
-    } else if (tag==REF) {
-    
-        Buffet *target = TARGET(buf);            
-        Store *store = STORE(target);
-     
-        if (store->canary != CANARY) {
-            ERR_CANARY;
-        } else if (!store->refcnt) {
-            ERR_REFCNT;
-        } else {    
-            -- store->refcnt;
-            if (!store->refcnt) {
-                // LOG("free ref : rid store");
-                store->canary = 0;
-                free(store);
-                ERASE(target);             
-            }
-        }
     }
 
     ERASE(buf);
@@ -314,68 +273,70 @@ buffet_free (Buffet *buf)
 size_t 
 buffet_append (Buffet *buf, const char *src, size_t srclen) 
 {
-    const Tag tag = TAG(buf);
-    const size_t curlen = tag ? buf->ptr.len : buf->sso.len;
-    const size_t newlen = curlen + srclen;
-    const size_t newcap = OVERALLOC*newlen;
-    char *curdata = (char*)getdata(buf,tag);
+    Tag tag = TAG(buf);
+    char *curdata, *newdata;
+    size_t curlen, newlen = 0;
 
-    if (tag==SSO||tag==OWN) {
+    if (tag == SSO) {
 
-        size_t cap = tag ? buf->ptr.aux : BUFFET_SSOMAX;
+        curdata = buf->sso.data;
+        curlen = buf->sso.len;
+        newlen = curlen + srclen;
 
-        if (newlen <= cap) {
-
-            memcpy (curdata+curlen, src, srclen);
-            curdata[newlen] = 0;
-            setlen(buf, newlen, tag);
-        
-        } else {
-
-            ptrdiff_t diff = src - curdata;
-            bool selfsrc = diff >= 0 && (size_t)diff <= cap;
-            // if (selfsrc) LOG("selfsrc");
-
-            char *data = grow(buf, newcap);
-            if (!data) {return 0;}
-
-            // update if self-append invalid
-            if (selfsrc && (data != curdata)) {
-                // LOG("selfsrc reloc");
-                src = data;
-            }
-
-            memcpy (data+curlen, src, srclen);
-            data[newlen] = 0;
-            buf->ptr.len = newlen;
+        if (newlen <= BUFFET_SSOMAX) {
+            newdata = curdata + curlen;
+            memcpy (newdata, src, srclen);
+            newdata[srclen] = 0;
+            buf->sso.len = newlen;
+            return newlen;
         }
-
+    
     } else {
 
-        if (tag==REF) {
+        curdata = buf->ptr.data;
+        curlen = buf->ptr.len;
+        newlen = curlen + srclen;
 
-            Buffet *target = TARGET(buf);
-            Store *store = STORE(target);
-            
-            // if invalid ref, erase it
-            if (store->canary != CANARY) {
-                ERR_CANARY;
-                ERASE(buf); // then append ?
-                return 0;
-            } else if (!store->refcnt) {
-                ERR_REFCNT;
-                ERASE(buf); // then append ?
-                return 0;
-            } else { 
-                -- store->refcnt;
+        // choice: no small owner. Downsized owner converts to SSO
+        // if (newlen <= BUFFET_SSOMAX) 
+
+        if (tag == OWN) {
+
+            Store *store = getstore(buf);
+            newdata = buf->ptr.data + curlen;
+
+            // In-place if src fits and buf is unique owner or lies at store end
+            if ((buf->ptr.off + newlen <= store->cap) &&
+               (store->refcnt < 2 || newdata == store->end)) {
+                
+                memcpy(newdata, src, srclen);
+                newdata[srclen] = 0;
+                store->end = newdata + srclen;
+                buf->ptr.len = newlen;
+                return newlen;
             }
+        
+            // detach
+            -- store->refcnt; //check?
         }
-
-        *buf = buffet_memcopy (curdata, curlen); 
-        buffet_append (buf, src, srclen);
     }
 
-    return newlen;
+    Store *newstore = new_store (OVERALLOC*newlen, newlen);
+    if (!newstore) return 0;
+    newdata = newstore->data;
+
+    memcpy (newdata, curdata, curlen);
+    memcpy (newdata+curlen, src, srclen);
+    newdata[newlen] = 0;
+
+    *buf = (Buffet){
+        .ptr.data = newdata,
+        .ptr.len = newlen,
+        .ptr.off = 0,
+        .ptr.tag = OWN
+    };
+    
+    return newlen;            
 }
 
 
@@ -461,7 +422,7 @@ buffet_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
     
     Buffet ret = buffet_new(totlen);
     const Tag rettag = TAG(&ret);
-    char* cur = (char*)getdata(&ret,rettag);
+    char* cur = getdata(&ret,rettag);
     cur[totlen] = 0; 
 
     for (int i=0; i < cnt; ++i) {
@@ -486,30 +447,30 @@ buffet_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
 const char*
 buffet_cstr (const Buffet *buf, bool *mustfree) 
 {
-    const Tag tag = TAG(buf);
-    const char *data = getdata(buf, tag);
+    Tag tag = TAG(buf);
     bool tofree = false;
-    char *ret = (char*)data;
+    char *ret;
 
-    if (tag>OWN) {
-
-        const size_t len = buf->ptr.len;
-        if (data[len]==0) goto fin;                
-
-        ret = malloc(len+1);
-
-        if (!ret) {
-            ERR_ALLOC;
-            ret = calloc(1,1); // "\0"
+    if (tag==SSO) {
+        ret = (char*)buf->sso.data;
+    } else {
+        size_t len = buf->ptr.len;
+        const char *data = buf->ptr.data;
+        if (data[len]==0) {
+            ret = (char*)data;
         } else {
-            memcpy (ret, data, len);
-            ret[len] = 0;
-        }
-        
-        tofree = true;
+            ret = malloc(len+1);
+            if (!ret) {
+                ERR_ALLOC;
+                ret = calloc(1,1);
+            } else {
+                memcpy (ret, data, len);
+                ret[len] = 0;
+            }
+            tofree = true;
+        }               
     }
 
-    fin:
     *mustfree = tofree;
     return ret;
 }
@@ -546,10 +507,10 @@ buffet_len (const Buffet* buf) {
 size_t
 buffet_cap (const Buffet* buf) {
     Tag tag = TAG(buf);
-    return 
-        tag == OWN ? CAP(buf)
-    :   tag == SSO ? BUFFET_SSOMAX
-    :   0;
+    if (tag==SSO) return BUFFET_SSOMAX;
+    if (tag==VUE) return 0;
+    Store* store = getstore(buf);
+    return store->cap;
 }
 
 void

@@ -6,6 +6,11 @@
 #include "log.h"
 #include "util.h"
 
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
+
 #define alphalen 1024/2
 const char *alpha;
 char tmp[alphalen+1];
@@ -69,7 +74,6 @@ void check_export (Buffet *buf, size_t off, size_t len) {
 //=============================================================================
 void unew (size_t cap) {
     Buffet buf = buffet_new(cap); 
-    // buffet_debug(&buf);
     check(buf, 0, 0);
     buffet_free(&buf); 
 }
@@ -105,7 +109,6 @@ void memcopy()
 void umemview (size_t off, size_t len)
 {
     Buffet buf = buffet_memview (alpha+off, len);
-
     check(buf, off, len);
     buffet_free(&buf);
 }
@@ -120,7 +123,6 @@ void memview()
 void ucopy (size_t off, size_t len) {
     Buffet src = buffet_memcopy (alpha, alphalen);
     Buffet buf = buffet_copy(&src, off, len);
-
     check(buf, off, len);
     buffet_free(&buf);
     buffet_free(&src);
@@ -157,19 +159,19 @@ void clone() {
     buffet_free(&view); \
     buffet_free(&src);
 
-#define uview_own(srclen, off, len) { \
+#define view_own(srclen, off, len) { \
     Buffet src = buffet_memcopy (alpha, srclen); \
     viewcheck(src, srclen, off, len) \
 }
 
-#define uview_ref(srclen, off, len) { \
+#define view_ref(srclen, off, len) { \
     Buffet buf = buffet_memcopy (alpha, alphalen); \
     Buffet src = buffet_view (&buf, 0, srclen); \
     viewcheck(src, srclen, off, len) \
     buffet_free(&buf); \
 }
 
-#define uview_vue(srclen, off, len) { \
+#define view_vue(srclen, off, len) { \
     Buffet src = buffet_memview (alpha, srclen); \
     viewcheck(src, srclen, off, len) \
 }
@@ -188,28 +190,26 @@ fun (srclen, srclen+1, 0);  /* bad off */ \
 fun (srclen, srclen+1, 1);  /* bad off */ \
 
 void view() {
-    uview_own (0, 0, 0);
-    VIEWCASES (uview_own, 8) // sso
-    VIEWCASES (uview_own, 60) // own
-    VIEWCASES (uview_ref, 8)
-    VIEWCASES (uview_ref, 60)
-    VIEWCASES (uview_vue, 8)
-    VIEWCASES (uview_vue, 60)
+    view_own (0, 0, 0);
+    VIEWCASES (view_own, 8) // sso
+    VIEWCASES (view_own, 60) // own
+    VIEWCASES (view_ref, 8)
+    VIEWCASES (view_ref, 60)
+    VIEWCASES (view_vue, 8)
+    VIEWCASES (view_vue, 60)
 }
 
 //=============================================================================
 
-void uappend_new (size_t cap, size_t len)
+void append_new (size_t cap, size_t len)
 {
     Buffet buf = buffet_new (cap);
     buffet_append (&buf, alpha, len);
-
     check(buf, 0, len);
-
     buffet_free(&buf);    
 }
 
-#define uappend_memcopy(initlen, len) {\
+#define append_memcopy(initlen, len) {\
     Buffet buf = buffet_memcopy (alpha, initlen); \
     buffet_append (&buf, alpha+initlen, len); \
     size_t totlen = initlen+len;\
@@ -217,7 +217,7 @@ void uappend_new (size_t cap, size_t len)
     buffet_free(&buf);    \
 }
 
-void uappend_memview (size_t initlen, size_t len)
+void append_memview (size_t initlen, size_t len)
 {
     size_t totlen = initlen+len;
     Buffet buf = buffet_memview (alpha, initlen);
@@ -228,19 +228,20 @@ void uappend_memview (size_t initlen, size_t len)
     buffet_free(&buf);    
 }
 
-void uappend_view (size_t initlen, size_t len)
+void append_view (size_t initlen, size_t len)
 {
+    size_t totlen = initlen+len;
     Buffet src = buffet_memcopy (alpha, initlen);
     Buffet ref = buffet_view (&src, 0, initlen);
     buffet_append (&ref, alpha+initlen, len);
 
-    check(ref, 0, initlen+len);
+    check(ref, 0, totlen); // 
     
     buffet_free(&ref); 
     buffet_free(&src);    
 }
 // justas idea
-void uappend_self (size_t len)
+void append_self (size_t len)
 {
     Buffet buf = buffet_memcopy (alpha, len);
     size_t finlen = 2*len;
@@ -257,48 +258,49 @@ void uappend_self (size_t len)
 
 void append()
 {
-    uappend_new (0, 0);
-    uappend_new (0, 8);
-    uappend_new (0, 40);
-    uappend_new (8, 0);
-    uappend_new (8, 5);
-    uappend_new (8, 6);
-    uappend_new (8, 7);
-    uappend_new (8, 8);
-    uappend_new (40, 0);    
-    uappend_new (40, 8);
-    uappend_new (40, 40);
+    append_new (0, 0);
+    append_new (0, 8);
+    append_new (0, 40);
+    append_new (8, 0);
+    append_new (8, 5);
+    append_new (8, 6);
+    append_new (8, 7);
+    append_new (8, 8);
+    append_new (40, 0);    
+    append_new (40, 8);
+    append_new (40, 40);
 
-    uappend_memcopy (4, 4);
-    uappend_memcopy (8, 5);
-    uappend_memcopy (8, 6);
-    uappend_memcopy (8, 7);
-    uappend_memcopy (8, 8);
-    uappend_memcopy (8, 20);
-    uappend_memcopy (20, 20);
+    append_memcopy (4, 4);
+    append_memcopy (8, 5);
+    append_memcopy (8, 6);
+    append_memcopy (8, 7);
+    append_memcopy (8, 8);
+    append_memcopy (8, 20);
+    append_memcopy (20, 20);
 
-    uappend_memview (4, 4);
-    uappend_memview (8, 5);
-    uappend_memview (8, 6);
-    uappend_memview (8, 7);
-    uappend_memview (8, 8);
-    uappend_memview (8, 20);
-    uappend_memview (20, 20);
+    append_memview (4, 4);
+    append_memview (8, 5);
+    append_memview (8, 6);
+    append_memview (8, 7);
+    append_memview (8, 8);
+    append_memview (8, 20);
+    append_memview (20, 20);
 
-    uappend_view (8, 4);
-    uappend_view (8, 20);
-    uappend_view (20, 20);
+    append_view (8, 4);
+    append_view (8, 20);
+    append_view (20, 20);
 
-    uappend_self (0);
-    uappend_self (4);
-    uappend_self (10);
-    uappend_self (16);
+    // append_self (0);
+    // append_self (4);
+    // append_self (10);
+    // append_self (16);
+
     // todo crazy self cases : crossing NUL, garbage only, ...
 }
 
 //==============================================================================
 
-#define usplitjoin(src, sep) { \
+#define usploin(src, sep) { \
     size_t srclen = strlen(src);\
     size_t seplen = strlen(sep);\
     int cnt; \
@@ -311,23 +313,23 @@ void append()
 }
 
 #define SPLOIN(a,b,sep) \
-    usplitjoin ("", #sep); \
-    usplitjoin (#sep, #sep); \
-    usplitjoin (#a, #sep); \
-    usplitjoin (#a #sep,  #sep);  \
-    usplitjoin (#a #sep #b,  #sep);  \
-    usplitjoin (#a #sep #b #sep,  #sep);  \
-    usplitjoin (#sep #a,  #sep); \
-    usplitjoin (#sep #a #sep,  #sep);  \
-    usplitjoin (#sep #a #sep #b,  #sep);  \
-    usplitjoin (#sep #a #sep #b #sep,  #sep);  \
-    usplitjoin (#a #sep #sep,  #sep);  \
-    usplitjoin (#a #sep #sep #b,  #sep);  \
-    usplitjoin (#a #sep #sep #b #sep #sep,  #sep);  \
-    usplitjoin (#sep #sep #a,  #sep); \
-    usplitjoin (#sep #sep #a #sep #sep,  #sep);  \
-    usplitjoin (#sep #sep #a #sep #sep #b,  #sep);  \
-    usplitjoin (#sep #sep #a #sep #sep #b #sep #sep, #sep); 
+    usploin ("", #sep); \
+    usploin (#sep, #sep); \
+    usploin (#a, #sep); \
+    usploin (#a #sep,  #sep);  \
+    usploin (#a #sep #b,  #sep);  \
+    usploin (#a #sep #b #sep,  #sep);  \
+    usploin (#sep #a,  #sep); \
+    usploin (#sep #a #sep,  #sep);  \
+    usploin (#sep #a #sep #b,  #sep);  \
+    usploin (#sep #a #sep #b #sep,  #sep);  \
+    usploin (#a #sep #sep,  #sep);  \
+    usploin (#a #sep #sep #b,  #sep);  \
+    usploin (#a #sep #sep #b #sep #sep,  #sep);  \
+    usploin (#sep #sep #a,  #sep); \
+    usploin (#sep #sep #a #sep #sep,  #sep);  \
+    usploin (#sep #sep #a #sep #sep #b,  #sep);  \
+    usploin (#sep #sep #a #sep #sep #b #sep #sep, #sep); 
 
 void splitjoin() 
 { 
@@ -367,7 +369,7 @@ void splitjoin()
 #define free_view(len) { \
     Buffet own = buffet_memcopy (alpha, 40); \
     Buffet ref = buffet_view (&own, 0, len); \
-    check_free(&ref, true); \
+    check_free(&ref, false); \
     check_free(&own, true); \
 }
 #define free_copy(len) { \
@@ -405,7 +407,7 @@ void double_free(size_t len) {
 #define double_free_ref(srclen, len) { \
     Buffet src = buffet_memcopy (alpha, srclen); \
     Buffet ref = buffet_view (&src, 0, len); \
-    check_free(&ref, true); \
+    check_free(&ref, false); \
     check_free(&ref, true); \
     check_free(&src, true); \
 }
@@ -500,20 +502,19 @@ void danger()
     free_alias(8, true);
     free_alias(40, true);
     
-    free_own_before_view (0, true, true)
+    free_own_before_view (0, false, true)
     free_own_before_view (8, false, true)
     free_own_before_view (40, false, true)
 
-    free_ref_alias (0, true, true, true)
-    free_ref_alias (8, true, true, true)
-    free_ref_alias (40, true, true, true)
+    free_ref_alias (0,  false, true, true)
+    free_ref_alias (8,  false, true, true)
+    free_ref_alias (40, false, true, true)
 
     view_after_reloc(8);
 
     view_after_free(8);
     view_after_free(40);
 
-    // view_alias_after_free(8); // useless.. SSO is copy
     view_alias_after_free(40);
 
     append_view_after_reloc(8,4);
@@ -528,7 +529,7 @@ void zero()
 
     assert (!buf.ptr.data);
     assert (!buf.ptr.len);
-    assert (!buf.ptr.aux);
+    assert (!buf.ptr.off);
     assert (!buf.ptr.tag);
 
     assert (!strcmp(buf.sso.data, ""));
@@ -549,7 +550,6 @@ void zero()
 int main()
 {
     LOG("unit tests... ");
-
     alpha = repeat(ALPHA64, alphalen);
 
     run(zero);

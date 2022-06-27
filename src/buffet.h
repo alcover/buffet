@@ -21,7 +21,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 typedef struct {
     char*  data;
     size_t len;
-    size_t aux:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;
+    size_t off:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;  //ptrdiff_t ? intptr_t ?
 } BuffetPtr;
 
 typedef struct {

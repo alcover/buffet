@@ -68,7 +68,6 @@ check:
 bench: 
 	@ ./$(bench) \
 	--benchmark_color=false \
-	--benchmark_out=bin/bench.out \
 	--benchmark_format=console
 
 clean:
