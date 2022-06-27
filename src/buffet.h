@@ -18,16 +18,16 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 
 #define TAGBITS 2
 
-// tag=OWN : slice of owned heap data
-// tag=VUE, off>0 : slice of SSO
-// tag=VUE, off=0 : slice of any data
+// tag=OWN : share of heap data
+// tag=SSV : small string view
+// tag=VUE : view of any data
 typedef struct {
     char*   data;
     size_t  len;
-    size_t  off:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;  //ptrdiff_t ? intptr_t ?
+    size_t  off:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;
 } BuffetPtr;
 
-// tag=SSO : in-situ string
+// tag=SSO : small string embedding
 typedef struct {
     char    data[sizeof(BuffetPtr)-2];
     uint8_t refcnt;

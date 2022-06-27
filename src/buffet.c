@@ -9,7 +9,7 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 #include "buffet.h"
 #include "log.h"
 
-typedef enum {SSO=0, OWN, VUE} Tag;
+typedef enum {SSO=0, OWN, SSV, VUE} Tag;
 
 // Shared heap allocation
 typedef struct {
@@ -70,7 +70,7 @@ new_vue (const char *src, size_t len)
     return (Buffet) {
         .ptr.data = (char*)src,
         .ptr.len = len,
-        .ptr.off = 0,
+        // .ptr.off = 0,
         .ptr.tag = VUE
     };
 }
@@ -89,8 +89,8 @@ new_ssovue (Buffet *src, size_t len, size_t off)
     return (Buffet) {
         .ptr.data = (char*)src->sso.data + off,
         .ptr.len = len,
-        .ptr.off = off+1,
-        .ptr.tag = VUE
+        .ptr.off = off,
+        .ptr.tag = SSV
     };
 }
 
@@ -103,6 +103,7 @@ dbg (const Buffet* buf)
         case SSO: sprintf(stag,"SSO"); break;
         case OWN: sprintf(stag,"OWN"); break;
         case VUE: sprintf(stag,"VUE"); break;
+        case SSV: sprintf(stag,"SSV"); break;
     }
 
     bool mustfree;
@@ -211,13 +212,13 @@ buffet_dup (const Buffet *src)
             ++ store->refcnt;
             break;
         }
+        
+        case VUE:
+            break;
 
-        case VUE: {
-            size_t vueoff = src->ptr.off;
-            if (vueoff) {
-                BuffetSSO *sso = (BuffetSSO*)(src->ptr.data - (vueoff-1));
-                ++ sso->refcnt;
-            }
+        case SSV: {
+            BuffetSSO *target = (BuffetSSO*)(src->ptr.data - src->ptr.off);
+            ++ target->refcnt;
             break;
         }
     }
@@ -241,17 +242,14 @@ buffet_view (Buffet *src, ptrdiff_t off, size_t len)
         case SSO: 
             return new_ssovue (src, len, off);
 
-        case VUE: {
+        case VUE:
+            // sub-vue on src's target
+            return new_vue (src->ptr.data + off, len);
+
+        case SSV: {
             size_t vueoff = src->ptr.off;
-            if (vueoff) {
-                // vue on sso
-                -- vueoff;    
-                Buffet *target = (Buffet*)(src->ptr.data - vueoff);
-                return new_ssovue (target, len, vueoff+off);
-            } else {
-                // sub-vue on src's target
-                return new_vue (src->ptr.data + off, len);
-            }
+            Buffet *target = (Buffet*)(src->ptr.data - vueoff);
+            return new_ssovue (target, len, vueoff+off);
         }
 
         case OWN: {
@@ -304,11 +302,9 @@ buffet_free (Buffet *buf)
             }
         }
 
-    } else if (tag==VUE && buf->ptr.off) {
-        // vue on sso
-        size_t off = buf->ptr.off - 1;
-        Buffet *target = (Buffet*)buf->ptr.data - off;
-        -- target->sso.refcnt; //check?
+    } else if (tag==SSV) {
+        BuffetSSO *target = (BuffetSSO*)(buf->ptr.data - buf->ptr.off);
+        -- target->refcnt; //check?
     }
 
     memset(buf, 0, sizeof(Buffet));
@@ -581,9 +577,11 @@ size_t
 buffet_cap (const Buffet* buf) {
     Tag tag = TAG(buf);
     if (tag==SSO) return BUFFET_SSOMAX;
-    if (tag==VUE) return 0;
-    Store* store = getstore(buf);
-    return store->cap;
+    if (tag==OWN) {
+        Store* store = getstore(buf);
+        return store->cap;
+    }
+    return 0;
 }
 
 void
