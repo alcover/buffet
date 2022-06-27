@@ -42,7 +42,7 @@ void* append(void *args)
 {
     int idx = *(int*)args;
     for (int i = 0; i < SRCLEN; ++i)
-        buffet_append(&buf, srcs[idx], 1);
+        buffet_cat(&buf, &buf, srcs[idx], 1);
     return NULL;
 }
 

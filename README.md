@@ -8,11 +8,11 @@
 ![schema](assets/buffet.png)  
 
 Buffet is an experimental polymorphic string buffer with
-- **SSO** (small string optimization)
-- **views** : no-copy references to slices of data  
-- **refcount** : secure release of owned data
+- **SSO** : small string optimization
+- **views** : no-copy slices  
+- **refcount** : secure release of referenced data
 
-It aims at total [**security**](#Security) with decent [**speed**](#Speed).  
+aiming at [**security**](#Security) with decent [**speed**](#Speed).  
 Coming: thread safety
 
 ---
@@ -20,33 +20,78 @@ Coming: thread safety
 ## How
 
 ```C
-// Hard values illustrate running on 64-bit
 union Buffet {
         
-    // OWN|REF|VUE
+    // OWN / VUE
     struct {
         char*  data
         size_t len
-        size_t aux:62, tag:2 // aux = cap|off
+        size_t off:62 tag:2
     } ptr
 
     // SSO
     struct {
-        char    data[23]
-        uint8_t len:6, tag:2
+        char    data[22]
+        uint8_t refcnt
+        uint8_t len:6 tag:2
     } sso
 }
 ```  
-The *tag* sets how Buffet is interpreted :
+The *tag* sets how a Buffet is interpreted :
 - `SSO` : in-situ char array
-- `OWN` : owning heap-allocated data (*aux* = capacity)
-- `REF` : slice of owned data (*aux* = offset)
-- `VUE` : slice of other data
+- `OWN` : sharing heap-allocated data
+- `VUE` : view on SSO or any data
 
-Any proper data (*SSO*/*OWN*) is null-terminated.  
+#### Schema
 
 ![schema](assets/schema.png)
 
+Say a long text is transient and must be copied.
+
+```C
+char longtext[] = "DATA STORE IS HEAP ALLOCATION";
+Buffet own1 = buffet_memcopy(longtext, sizeof(longtext));
+```
+Since *longtext* is too large for an SSO, a heap Store is allocated to house it.  
+*Own1* owns the store.
+
+Say we want to *look* at the word "STORE" in *own1*.  
+No need to copy again, suffice to take a view.
+
+```C
+Buffet own2 = buffet_view(own1, 5, 5);
+```
+Now *own2* shares the store with *own1*.  
+The store's reference count bumps to 2.  
+Only when it gets back to 0 can the store be released.
+
+
+Say we do the same as above but on a short input.
+
+```C
+char shorttext[] = "BUFFET";
+Buffet sso = buffet_memcopy(shorttext, 6);
+```
+
+We get an SSO Buffet embedding the text. No allocation.  
+
+Now taking a view of *sso* produces another sub-type : VUE.  
+This special case of VUE targets an SSO. This is indicated by the non-zero
+offset field : 4-1 = 3 bytes into the SSO.
+
+```C
+Buffet vue1 = buffet_memview(sso, 3, 3);
+```
+*sso*, like a store, tracks views in a refcount.
+
+Say we want to view data from a source that stays in scope.  
+Here *memview* produces a plain VUE with a 0 offset meaning the source
+is not controlled by Buffet.
+
+```C
+char somebytes[] = "SOME BYTES";
+Buffet vue2 = buffet_memview(somebytes, 5);
+```
 
 ### example
 
@@ -83,11 +128,11 @@ raining
 ```
 
 
-### Build & unit-test
+### Build & test
 
 `make && make check`
 
-While extensive, tests may not yet cover *all* cases.
+While extensive, unit tests may not yet cover *all* cases.
 
 
 ### Speed
@@ -95,45 +140,42 @@ While extensive, tests may not yet cover *all* cases.
 `$ make && make benchcpp`  
 (requires *libbenchmark-dev*)  
 
-NB: No effort has yet been done on optimization.  
-NB: Bench is maybe unfair.
+NB: No effort has been done on optimization, plus bench may be unfair.  
 
 On a weak Thinkpad :  
 ```
-MEMCOPY_plainc/8            18 ns
-MEMCOPY_buffet/8            19 ns
-MEMCOPY_plainc/32           18 ns
-MEMCOPY_buffet/32           27 ns
-MEMCOPY_plainc/128          21 ns
-MEMCOPY_buffet/128          29 ns
-MEMCOPY_plainc/512          30 ns
-MEMCOPY_buffet/512          41 ns
-MEMCOPY_plainc/2048         80 ns
-MEMCOPY_buffet/2048        102 ns
-MEMCOPY_plainc/8192        205 ns
-MEMCOPY_buffet/8192        282 ns
 MEMVIEW_cppview/8            1 ns
-MEMVIEW_buffet/8             7 ns
-APPEND_cppstr/8/4            8 ns
-APPEND_buffet/8/4           12 ns
-APPEND_cppstr/8/16          12 ns
-APPEND_buffet/8/16          13 ns
-APPEND_cppstr/24/4           7 ns
-APPEND_buffet/24/4          12 ns
-APPEND_cppstr/24/32         30 ns
-APPEND_buffet/24/32         18 ns
-SPLITJOIN_plainc          3213 ns
-SPLITJOIN_cppview         3294 ns
-SPLITJOIN_buffet          1516 ns
+MEMVIEW_buffet/8             6 ns
+MEMCOPY_plainc/8            17 ns
+MEMCOPY_buffet/8            12 ns
+MEMCOPY_plainc/32           16 ns
+MEMCOPY_buffet/32           27 ns
+MEMCOPY_plainc/128          17 ns
+MEMCOPY_buffet/128          30 ns
+MEMCOPY_plainc/512          26 ns
+MEMCOPY_buffet/512          42 ns
+MEMCOPY_plainc/2048         95 ns
+MEMCOPY_buffet/2048        104 ns
+MEMCOPY_plainc/8192        199 ns
+MEMCOPY_buffet/8192        285 ns
+APPEND_cppstr/8/4           13 ns
+APPEND_buffet/8/4           33 ns
+APPEND_cppstr/8/16          34 ns
+APPEND_buffet/8/16          34 ns
+APPEND_cppstr/24/4          49 ns
+APPEND_buffet/24/4          34 ns
+APPEND_cppstr/24/32         48 ns
+APPEND_buffet/24/32         33 ns
+SPLITJOIN_plainc          2864 ns
+SPLITJOIN_cppview         3087 ns
+SPLITJOIN_buffet          1380 ns
 ```
 
 
 ### Security
 
-Buffet aims at preventing any memory fault, including from user.  
-(Except of course when a reference target goes out of scope..)  
-
-See *check.c : danger()*.  
+Buffet aims at preventing memory faults, including from user.  
+(Except of course losing scope and such..)  
 
 - double-free
 
@@ -168,13 +210,16 @@ For this, heap-stored data is controlled by a header :
 
 ```C
 struct Store {
+    cap
+    end
     refcnt
     canary
     data[]
 }
 ```
 
-On some operations like *view*, *append* or *free*, we check the Store for a live canary and coherent refcount. If either fails, the operation is aborted and the Buffet struct possibly zeroed. 
+On some operations like *view*, *append* or *free*, we check the Store for a live canary and coherent refcount.  
+If either fails, operation is aborted and the return possibly a zero-buffet. 
 
 ---
 
@@ -252,17 +297,18 @@ Copy *len* bytes of Buffet *src*, starting at *off*.
 
 ### buffet_view
 ```C
-Buffet buffet_view (const Buffet *src, ptrdiff_t off, size_t len)
+Buffet buffet_view (Buffet *src, ptrdiff_t off, size_t len)
 ```
 View *len* bytes of Buffet *src*, starting at *off*.  
 You get a window into *src* without copy or allocation.  
 
-Internally the return is either 
-- a *REF* to *src* if *src* is *OWN* or *SSO*
-- a *REF* to *src*'s target if *src* is *REF*
-- a *VUE* on *src*'s target if *src* is *VUE*
+The return's internal type depends on *src* type : 
+- *OWN* (as store co-owner) if *OWN*
+- refcounted *VUE* if *SSO*
+- plain *VUE* on *src*'s target if plain *VUE*
+- refcounted *VUE* on *src*'s target if *SSO-VUE*
 
-If the return is a *REF*, the targetted data cannot be released before either  
+If the return is a *OWN*, the targetted won't be released before either  
 - the return is released
 - the return is detached, e.g. when you `append` to it.
 
@@ -270,11 +316,11 @@ If the return is a *REF*, the targetted data cannot be released before either
 // view own
 Buffet own = buffet_memcopy("Bonjour monsieur buddy", 16);
 Buffet Bonjour = buffet_view(&own, 0, 7);
-buffet_debug(&Bonjour); // tag:REF cstr:'Bonjour'
+buffet_debug(&Bonjour); // OWN cstr:'Bonjour'
 
-// view ref
+// sub-view
 Buffet Bon = buffet_view(&Bonjour, 0, 3);
-buffet_debug(&Bon); // tag:REF cstr:'Bon'
+buffet_debug(&Bon); // OWN cstr:'Bon'
 
 // detach views
 buffet_append(&Bonjour, "!", 1); // "Bonjour!"
@@ -284,12 +330,12 @@ buffet_free(&own); // OK
 // view vue
 Buffet vue = buffet_memview("Good day", 4); // "Good"
 Buffet Goo = buffet_view(&vue, 0, 3);
-buffet_debug(&Goo); // tag:VUE cstr:'Goo'
+buffet_debug(&Goo); // VUE cstr:'Goo'
 
 // view sso
 Buffet sso = buffet_memcopy("Hello", 5);
 Buffet Hell = buffet_view(&sso, 0, 4);
-buffet_debug(&Hell); // tag:VUE cstr:'Hell'
+buffet_debug(&Hell); // VUE cstr:'Hell'
 buffet_free(&Hell); // OK
 buffet_free(&sso); // OK
 ```
@@ -315,7 +361,6 @@ Rem: assigning would mostly work but mess up refcounting (without crash if Store
 Buffet alias = sso; //ok
 Buffet alias = vue; //ok
 Buffet alias = own; //not refcounted
-Buffet alias = ref; //not refcounted
 ```
 
 
@@ -349,19 +394,49 @@ All heap blocks were freed -- no leaks are possible
 ```
 
 
+
+### buffet_cat
+```C
+size_t buffet_cat (Buffet *dst, const Buffet *buf, const char *src, size_t len)
+```
+Concatenates *buf* and *len* bytes of *src* into resulting *dst*.  
+Returns total length or 0 on error.
+
+```C
+Buffet buf = buffet_memcopy("abc", 3);
+Buffet dst;
+size_t totlen = buffet_cat(&dst, &buf, "def", 3);
+buffet_debug(&dst);
+// SSO len:6 cstr:'abcdef'
+```
+
+NB: in-place **appending** by *buffet_cat(buf, buf, ...)* may abort and return failure if *buf* is an SSO with live views and is too small for the new data.  
+Because *buf* would need to mutate into an OWN, invalidating the views.  
+To avoid this, you should release views prior to appending.  
+
+This is why *buffet_append(dst)* is an alias for *buffet_cat(dst, dst)*.  
+An independant *append* with the following profile :  
+```Buffet append(Buffet *dst, char *src)```  
+would not prevent the user from 
+
+```C
+dst = append(dst, foo);
+```
+
+
 ### buffet_append
 ```C
 size_t buffet_append (Buffet *dst, const char *src, size_t len)
 ```
+Alias for *buffet_cat(dst, dst, src, len)*.  
 Appends *len* bytes from *src* to *dst*.  
 Returns new length or 0 on error.
-If over capacity, *dst* gets reallocated. 
 
 ```C
 Buffet buf = buffet_memcopy("abc", 3); 
-size_t newlen = buffet_append(&buf, "def", 3); // newlen == 6 
+size_t newlen = buffet_append(&buf, "def", 3);
 buffet_debug(&buf);
-// SSO cap:14 len:6 cstr:'abcdef'
+// SSO len:6 cstr:'abcdef'
 ```
 
 

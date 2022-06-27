@@ -18,14 +18,19 @@ Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
 
 #define TAGBITS 2
 
+// tag=OWN : slice of owned heap data
+// tag=VUE, off>0 : slice of SSO
+// tag=VUE, off=0 : slice of any data
 typedef struct {
-    char*  data;
-    size_t len;
-    size_t off:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;  //ptrdiff_t ? intptr_t ?
+    char*   data;
+    size_t  len;
+    size_t  off:8*sizeof(size_t)-TAGBITS, tag:TAGBITS;  //ptrdiff_t ? intptr_t ?
 } BuffetPtr;
 
+// tag=SSO : in-situ string
 typedef struct {
-    char    data[sizeof(BuffetPtr)-1];
+    char    data[sizeof(BuffetPtr)-2];
+    uint8_t refcnt;
     uint8_t len:8-TAGBITS, tag:TAGBITS;
 } BuffetSSO;
 
@@ -62,14 +67,15 @@ Buffet* buffet_split (const char* src, size_t srclen,
                       const char* sep, size_t seplen, int *outcnt);
 Buffet* buffet_splitstr (const char *src, const char *sep, int *outcnt);
 
-// Modify
-size_t  buffet_append (Buffet *dst, const char *src, size_t len);
+
+size_t  buffet_cat (Buffet *dst, const Buffet *buf, const char *src, size_t len);
+#define buffet_append(buf, src, len) buffet_cat(buf, buf, src, len)
 bool    buffet_free (Buffet *buf);
 
 // Access
 const char* buffet_data (const Buffet *buf);
 const char* buffet_cstr (const Buffet *buf, bool *mustfree);
-char*   buffet_export (const Buffet *buf);
+char*       buffet_export (const Buffet *buf);
 size_t  buffet_cap (const Buffet *buf);
 size_t  buffet_len (const Buffet *buf);
 

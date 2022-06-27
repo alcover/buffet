@@ -14,7 +14,7 @@ int main() {
 	buffet_debug(&Bon); // REF cstr:'Bon'
 
 	// detach views
-	buffet_append(&Bonjour, "!", 1);
+	buffet_cat (&Bonjour, &Bonjour, "!", 1);
 	buffet_free(&Bon); 
 	buffet_free(&own); // OK
 

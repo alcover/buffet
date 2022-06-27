@@ -12,8 +12,8 @@ LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin/ex)
 
-lib = bin/buffet
-asm = bin/buffet.s
+lib = bin/libbuffet.a
+asm = bin/libbuffet.s
 check = bin/check
 bench =	bin/bench
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))

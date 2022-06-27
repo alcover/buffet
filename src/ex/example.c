@@ -14,7 +14,7 @@ int main()
 	buffet_print(&ref); // "rain"
 
 	char tail[] = "ing";
-	buffet_append (&ref, tail, sizeof(tail));
+	buffet_cat (&ref, &ref, tail, sizeof(tail));
 	buffet_print(&ref); // "raining"
 
 	return 0;

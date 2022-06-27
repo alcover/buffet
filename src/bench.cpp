@@ -117,7 +117,7 @@ APPEND_buffet (benchmark::State& state)
     for (auto _ : state) {
     Buffet dst = buffet_memview(alpha, initlen);
         benchmark::DoNotOptimize(dst);
-        buffet_append (&dst, alpha+initlen, appnlen);
+        buffet_cat (&dst, &dst, alpha+initlen, appnlen);
         // assert (!strncmp(buffet_data(&dst), alpha, initlen+appnlen));
     buffet_free(&dst);
     }
@@ -196,12 +196,12 @@ BENCHMARK(two)->Args({24,4});\
 BENCHMARK(one)->Args({24,32});\
 BENCHMARK(two)->Args({24,32});\
 
-// MEMVIEW (MEMVIEW_cppview, MEMVIEW_buffet);
-// MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
+MEMVIEW (MEMVIEW_cppview, MEMVIEW_buffet);
+MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
 APPEND (APPEND_cppstr, APPEND_buffet);
-// BENCHMARK(SPLITJOIN_plainc);
-// BENCHMARK(SPLITJOIN_cppview);
-// BENCHMARK(SPLITJOIN_buffet);
+BENCHMARK(SPLITJOIN_plainc);
+BENCHMARK(SPLITJOIN_cppview);
+BENCHMARK(SPLITJOIN_buffet);
 
 int main(int argc, char** argv)
 {
