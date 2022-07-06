@@ -1,21 +1,20 @@
 #ifndef ALCO_LOG_H
 #define ALCO_LOG_H
 
-#define LOG(args...) do { \
-	printf(args);  \
-	printf("\n"); \
-	fflush(stdout); \
-} while(0)
-
 #define ERR(args...) do { \
 	fprintf(stderr,"line %d: ",__LINE__);  \
 	fprintf(stderr,args); \
 } while(0)
 
-
 #define WARN(args...) do { \
 	fprintf(stderr,"WARN line:%d ",__LINE__);  \
 	fprintf(stderr,args); \
+} while(0)
+
+#define LOG(args...) do { \
+	printf(args);  \
+	printf("\n"); \
+	fflush(stdout); \
 } while(0)
 
 #define LOGS(s,msg) do { \
@@ -37,6 +36,5 @@
 	printf("%s : %d\n", #id, (int)id); \
 	fflush(stdout); \
 } while(0)
-
 
 #endif

@@ -5,11 +5,10 @@ extern "C" {
 #include <stdio.h>
 #include "buffet.h"
 #include "util.h"
-#include "log.h"
 }
 
 #define alphalen (1024*1024)
-const char *alpha = NULL;
+char alpha[alphalen+1] = {0};
 
 #define SPC " "
 #define SEP SPC 
@@ -37,7 +36,7 @@ const char *SPLITME =
     assert (len < alphalen);
 
 static void
-MEMCOPY_plainc (benchmark::State& state) 
+MEMCOPY_c (benchmark::State& state) 
 {
     GETLEN
 
@@ -57,16 +56,16 @@ MEMCOPY_buffet (benchmark::State& state)
     GETLEN
 
     for (auto _ : state) {
-        Buffet buf = buffet_memcopy(alpha, len);
+        Buffet buf = bft_memcopy(alpha, len);
         benchmark::DoNotOptimize(buf);
-        // assert (!strncmp(buffet_data(&buf), alpha, len));
-        buffet_free(&buf);
+        // assert (!strncmp(bft_data(&buf), alpha, len));
+        bft_free(&buf);
     }
 }
 
 //=============================================================================
 static void
-MEMVIEW_cppview (benchmark::State& state) 
+MEMVIEW_cpp (benchmark::State& state) 
 {
     GETLEN
 
@@ -83,9 +82,9 @@ MEMVIEW_buffet (benchmark::State& state)
     GETLEN
 
     for (auto _ : state) {
-        Buffet buf = buffet_memview(alpha, len);
+        Buffet buf = bft_memview(alpha, len);
         benchmark::DoNotOptimize(buf);
-        // assert (!strncmp(buffet_data(&buf), alpha, len));
+        // assert (!strncmp(bft_data(&buf), alpha, len));
     }
 }
  
@@ -96,7 +95,7 @@ MEMVIEW_buffet (benchmark::State& state)
     assert (initlen+appnlen < alphalen);
 
 static void 
-APPEND_cppstr (benchmark::State& state) 
+APPEND_cpp (benchmark::State& state) 
 {
     APPEND_INIT
 
@@ -115,17 +114,17 @@ APPEND_buffet (benchmark::State& state)
     APPEND_INIT
 
     for (auto _ : state) {
-    Buffet dst = buffet_memview(alpha, initlen);
+    Buffet dst = bft_memview(alpha, initlen);
         benchmark::DoNotOptimize(dst);
-        buffet_cat (&dst, &dst, alpha+initlen, appnlen);
-        // assert (!strncmp(buffet_data(&dst), alpha, initlen+appnlen));
-    buffet_free(&dst);
+        bft_cat (&dst, &dst, alpha+initlen, appnlen);
+        // assert (!strncmp(bft_data(&dst), alpha, initlen+appnlen));
+    bft_free(&dst);
     }
 }
 
 //=============================================================================
 static void 
-SPLITJOIN_plainc (benchmark::State& state) 
+SPLITJOIN_c (benchmark::State& state) 
 {
     for (auto _ : state) {
         int cnt = 0;
@@ -140,7 +139,7 @@ SPLITJOIN_plainc (benchmark::State& state)
 }
 
 static void 
-SPLITJOIN_cppview (benchmark::State& state) 
+SPLITJOIN_cpp (benchmark::State& state) 
 {
     for (auto _ : state) {
         vector<string_view> parts = split_cppview(SPLITME, sep);
@@ -156,12 +155,12 @@ SPLITJOIN_buffet (benchmark::State& state)
 {
     for (auto _ : state) {
         int cnt = 0;
-        Buffet *parts = buffet_splitstr(SPLITME, sep, &cnt);
-        Buffet back = buffet_join(parts, cnt, sep, strlen(sep));
-        const char *ret = buffet_data(&back);
+        Buffet *parts = bft_splitstr(SPLITME, sep, &cnt);
+        Buffet back = bft_join(parts, cnt, sep, strlen(sep));
+        const char *ret = bft_data(&back);
 
         // assert(!strcmp(ret, SPLITME));
-        buffet_free(&back);
+        bft_free(&back);
         free(parts);
     }
 }
@@ -196,20 +195,19 @@ BENCHMARK(two)->Args({24,4});\
 BENCHMARK(one)->Args({24,32});\
 BENCHMARK(two)->Args({24,32});\
 
-MEMVIEW (MEMVIEW_cppview, MEMVIEW_buffet);
-MEMCOPY (MEMCOPY_plainc, MEMCOPY_buffet);
-APPEND (APPEND_cppstr, APPEND_buffet);
-BENCHMARK(SPLITJOIN_plainc);
-BENCHMARK(SPLITJOIN_cppview);
+MEMVIEW (MEMVIEW_cpp, MEMVIEW_buffet);
+MEMCOPY (MEMCOPY_c, MEMCOPY_buffet);
+APPEND (APPEND_cpp, APPEND_buffet);
+BENCHMARK(SPLITJOIN_c);
+BENCHMARK(SPLITJOIN_cpp);
 BENCHMARK(SPLITJOIN_buffet);
 
 int main(int argc, char** argv)
 {
-    alpha = repeat(ALPHA64, alphalen);
+    repeatat(alpha, alphalen, ALPHA64);
 
     ::benchmark::Initialize(&argc, argv);
     ::benchmark::RunSpecifiedBenchmarks();
 
     // fgetc(stdin);
-    free(alpha);
 }

@@ -11,7 +11,7 @@
 #endif
 
 #define alphalen (128)
-const char *alpha;
+char alpha[alphalen+1];
 char tmp[alphalen+1];
 
 // put a slice of alpha into tmp
@@ -32,32 +32,32 @@ exit(EXIT_FAILURE);}}
 
 #define assert_stn(val, exp, n) { if (strncmp((val), (exp), (n))) {\
 fprintf(stderr, \
-    "%d: %d bytes %s:'%s' != '%s'\n", __LINE__, (int)(n), #val, (val), (exp)); \
+    "%d: %d bytes %s:'%.*s' != '%s'\n", __LINE__, (int)(n), #val, (int)(n), (val), (exp)); \
 exit(EXIT_FAILURE);}}
 
 
-#define check_props(buf, off, len) { \
+#define check_props(buf, off, len) do{ \
     /* len */ \
-    assert_int (buffet_len(buf), len); \
+    assert_int (bft_len(buf), len); \
     /* data */ \
     const char *exp = take(off,len); \
-    assert_stn (buffet_data(buf), exp, len); \
+    assert_stn (bft_data(buf), exp, len); \
     /* cstr */ \
     bool mustfree; \
-    const char *cstr = buffet_cstr(buf, &mustfree); \
+    const char *cstr = bft_cstr(buf, &mustfree); \
     assert_str (cstr, exp); \
     if (mustfree) free((char*)cstr); \
     /* export */ \
-    char *export = buffet_export(buf); \
+    char *export = bft_export(buf); \
     assert_str (export, exp); \
     free(export); \
-}
+}while(0)
 
 #define check_zero(buf) { \
-    assert_int (buffet_len(buf), 0); \
-    assert_str (buffet_data(buf), ""); \
+    assert_int (bft_len(buf), 0); \
+    assert_str (bft_data(buf), ""); \
     bool mustfree; \
-    const char *cstr = buffet_cstr(buf, &mustfree); \
+    const char *cstr = bft_cstr(buf, &mustfree); \
     assert_str (cstr, ""); \
     assert(!mustfree); \
 }
@@ -79,9 +79,9 @@ exit(EXIT_FAILURE);}}
 
 //=============================================================================
 void unew (size_t cap) {
-    Buffet buf = buffet_new(cap); 
+    Buffet buf = bft_new(cap); 
     check_props(&buf, 0, 0);
-    buffet_free(&buf); 
+    bft_free(&buf); 
 }
 
 void new() 
@@ -98,10 +98,10 @@ void new()
 }
 
 //=============================================================================
-void umemcopy (size_t off, size_t len) {
-    Buffet buf = buffet_memcopy (alpha+off, len);
+void umemcopy(size_t off, size_t len) {
+    Buffet buf = bft_memcopy(alpha+off, len);
     check_props(&buf, off, len);    
-    buffet_free(&buf);
+    bft_free(&buf);
 }
 
 void memcopy() 
@@ -112,9 +112,9 @@ void memcopy()
 
 //=============================================================================
 void umemview (size_t off, size_t len) {
-    Buffet buf = buffet_memview (alpha+off, len);
+    Buffet buf = bft_memview (alpha+off, len);
     check_props(&buf, off, len);
-    buffet_free(&buf);
+    bft_free(&buf);
 }
 
 void memview() 
@@ -125,64 +125,64 @@ void memview()
 
 //=============================================================================
 #define dup_new(len) { \
-    Buffet src = buffet_new(len); \
-    Buffet buf = buffet_dup(&src); \
+    Buffet src = bft_new(len); \
+    Buffet buf = bft_dup(&src); \
     check_props(&buf, 0, 0); \
-    buffet_free(&buf); \
-    buffet_free(&src); \
+    bft_free(&buf); \
+    bft_free(&src); \
 }
 
 #define dup_memcopy(len) { \
-    Buffet src = buffet_memcopy(alpha, len); \
-    Buffet buf = buffet_dup(&src); \
+    Buffet src = bft_memcopy(alpha, len); \
+    Buffet buf = bft_dup(&src); \
     check_props(&buf, 0, len); \
-    buffet_free(&buf); \
-    buffet_free(&src); \
+    bft_free(&buf); \
+    bft_free(&src); \
 }
 
 #define dup_memview(len) { \
-    Buffet src = buffet_memview(alpha, len); \
-    Buffet buf = buffet_dup(&src); \
+    Buffet src = bft_memview(alpha, len); \
+    Buffet buf = bft_dup(&src); \
     check_props(&buf, 0, len); \
-    buffet_free(&buf); \
-    buffet_free(&src); \
+    bft_free(&buf); \
+    bft_free(&src); \
 }
 
 #define dup_view(srclen, len) { \
-    Buffet src = buffet_memcopy(alpha, srclen); \
-    Buffet ref = buffet_view (&src, 0, len); \
-    Buffet buf = buffet_dup(&ref); \
+    Buffet src = bft_memcopy(alpha, srclen); \
+    Buffet ref = bft_view(&src, 0, len); \
+    Buffet buf = bft_dup(&ref); \
     check_props(&buf, 0, len); \
-    buffet_free(&buf); \
-    buffet_free(&ref); \
-    buffet_free(&src); \
+    bft_free(&buf); \
+    bft_free(&ref); \
+    bft_free(&src); \
 }
 
 void dup()
 {
     dup_new(0);
     dup_new(8);
-    dup_new(40);
+    dup_new(32);
     dup_memcopy(0);
     dup_memcopy(8);
-    dup_memcopy(40);
+    dup_memcopy(32);
     dup_memview(0);
     dup_memview(8);
-    dup_memview(40);
+    dup_memview(32);
     dup_view(8, 0);
     dup_view(8, 4);
-    dup_view(40, 0);
-    dup_view(40, 20);
+    dup_view(32, 0);
+    dup_view(32, 16);
 }
 
 
 //=============================================================================
 void ucopy (size_t off, size_t len) {
-    Buffet src = buffet_memcopy (alpha, alphalen);
-    Buffet buf = buffet_copy(&src, off, len);
+    Buffet src = bft_memcopy(alpha, alphalen);
+    Buffet buf = bft_copy(&src, off, len);
     check_props(&buf, off, len);
-    buffet_free(&buf);
-    buffet_free(&src);
+    bft_free(&buf);
+    bft_free(&src);
 }
 
 void copy() 
@@ -193,32 +193,41 @@ void copy()
 }
 
 
-//=============================================================================
+//===== VIEW ==================================================================
+
 #define viewcheck(src, srclen, off, len) \
-    Buffet view = buffet_view (&src, off, len); \
+    Buffet view = bft_view(&src, off, len); \
     size_t explen = len; \
     if (off>=srclen) explen = 0; \
     else if (off+len>=srclen) explen = srclen-off; \
-    assert_int (buffet_len(&view), explen); \
-    assert_stn (buffet_data(&view), alpha+off, explen); \
-    buffet_free(&view); \
-    buffet_free(&src);
+    assert_int (bft_len(&view), explen); \
+    assert_stn (bft_data(&view), alpha+off, explen); \
+    bft_free(&view); \
+    bft_free(&src);
 
-#define view_own(srclen, off, len) { \
-    Buffet src = buffet_memcopy (alpha, srclen); \
+
+#define view_new(cap, off, len) { \
+    Buffet src = bft_new(cap); \
+    Buffet view = bft_view(&src, off, len); \
+    assert_int (bft_len(&view), 0); \
+    assert_str (bft_data(&view), ""); \
+}
+
+#define view_memcopy(srclen, off, len) { \
+    Buffet src = bft_memcopy(alpha, srclen); \
     viewcheck(src, srclen, off, len) \
 }
 
-#define view_ref(srclen, off, len) { \
-    Buffet buf = buffet_memcopy (alpha, alphalen); \
-    Buffet src = buffet_view (&buf, 0, srclen); \
+#define view_memview(srclen, off, len) { \
+    Buffet src = bft_memview (alpha, srclen); \
     viewcheck(src, srclen, off, len) \
-    buffet_free(&buf); \
 }
 
-#define view_vue(srclen, off, len) { \
-    Buffet src = buffet_memview (alpha, srclen); \
+#define view_view(srclen, off, len) { \
+    Buffet buf = bft_memcopy(alpha, alphalen); \
+    Buffet src = bft_view (&buf, 0, srclen); \
     viewcheck(src, srclen, off, len) \
+    bft_free(&buf); \
 }
 
 #define VIEWCASES(fun, srclen)\
@@ -234,197 +243,205 @@ fun (srclen, srclen, 1);    /* bad off */ \
 fun (srclen, srclen+1, 0);  /* bad off */ \
 fun (srclen, srclen+1, 1);  /* bad off */ \
 
-
-
-void view_alias_after_free (size_t initlen)
-{
-    Buffet src = buffet_memcopy (alpha, initlen);
-    Buffet alias = src;
-    buffet_free(&src);    
-    Buffet ref = buffet_view (&alias, 0, initlen);
-
-    check_props(&ref, 0, 0);
-    
-    buffet_free(&ref); 
+#define view_alias_after_free(initlen) { \
+    Buffet src = bft_memcopy(alpha, initlen); \
+    Buffet alias = src; \
+    bft_free(&src);     \
+    Buffet ref = bft_view (&alias, 0, initlen); \
+    check_props(&ref, 0, 0); \
+    bft_free(&ref);  \
 }
 
 void view() 
 {
-    view_own (0, 0, 0);
-    VIEWCASES (view_own, 8) // sso
-    VIEWCASES (view_own, 60) // own
-    VIEWCASES (view_ref, 8)
-    VIEWCASES (view_ref, 60)
-    VIEWCASES (view_vue, 8)
-    VIEWCASES (view_vue, 60)
+    view_new (0, 0, 0);
+    view_new (0, 8, 0);
+    view_new (0, 8, 8);
+    view_new (8, 0, 0);
+    view_new (8, 0, 4);
+    view_new (8, 0, 8);
+    view_new (32, 0, 0);
+    view_new (32, 0, 16);
+    view_new (32, 0, 32);
+
+    VIEWCASES (view_memcopy, 8)
+    VIEWCASES (view_memcopy, 32)
+    VIEWCASES (view_memview, 8)
+    VIEWCASES (view_memview, 32)
+    VIEWCASES (view_view, 8)
+    VIEWCASES (view_view, 32)
     
-    // danger
-
-    view_alias_after_free(40);
+    // view_alias_after_free(8); // useless. SSO alias is copy.
+    view_alias_after_free(32);
 }
-
 
 //==============================================================================
 
 #define ucat(dst, buf, buflen, len) {\
-    size_t rc = buffet_cat (dst, buf, alpha+buflen, len); \
+    size_t rc = bft_cat(dst, buf, alpha+buflen, len); \
     size_t explen = buflen+len; \
     assert_int(rc, explen); \
     check_props(dst, 0, explen);\
-    buffet_free(dst); \
-    buffet_free(buf); \
-}
-
-// append : cat(buf,buf)
-#define uapn(buf, buflen, len) {\
-    size_t rc = buffet_cat (buf, buf, alpha+buflen, len); \
-    size_t explen = buflen+len; \
-    assert_int(rc, explen); \
-    check_props(buf, 0, explen);\
-    buffet_free(buf); \
+    bft_free(dst); \
+    bft_free(buf); \
 }
 
 #define cat_new(cap, len) {\
     Buffet dst; \
-    Buffet buf = buffet_new(cap);\
+    Buffet buf = bft_new(cap);\
     ucat (&dst, &buf, 0, len) \
-}
-
-#define apn_new(cap, len) {\
-    Buffet buf = buffet_new(cap);\
-    uapn (&buf, 0, len) \
 }
 
 #define cat_init(op, buflen, len) {\
     Buffet dst; \
-    Buffet buf = buffet_##op (alpha, buflen); \
+    Buffet buf = bft_##op(alpha, buflen); \
     ucat (&dst, &buf, buflen, len); \
 }
 
-#define apn_init(op, buflen, len) {\
-    Buffet buf = buffet_##op (alpha, buflen); \
-    uapn (&buf, buflen, len); \
-}
-
 #define cat_view(buflen, len) { \
-    Buffet src = buffet_memcopy (alpha, buflen); \
-    Buffet ref = buffet_view (&src, 0, buflen); \
+    Buffet src = bft_memcopy(alpha, buflen); \
+    Buffet ref = bft_view (&src, 0, buflen); \
     Buffet dst; \
     ucat (&dst, &ref, buflen, len) \
-    buffet_free(&src); \
-}
-
-#define apn_view(buflen, len) { \
-    Buffet src = buffet_memcopy (alpha, buflen); \
-    Buffet ref = buffet_view (&src, 0, buflen); \
-    uapn (&ref, buflen, len) \
-    buffet_free(&src); \
-}
-
-#define apn_viewed(buflen, len, exprc) { \
-    Buffet buf = buffet_memcopy (alpha, buflen); \
-    Buffet ref = buffet_view (&buf, 0, buflen); \
-    size_t rc = buffet_cat (&buf, &buf, alpha+buflen, len); \
-    assert_int(rc, exprc); \
-    if (rc) {check_props(&buf, 0, (buflen+len));} \
-    buffet_free(&ref); \
-    buffet_free(&buf); \
+    bft_free(&src); \
 }
 
 void cat()
 {
     cat_new (0, 0);
     cat_new (0, 4);
-    cat_new (0, 40);
+    cat_new (0, 32);
     cat_new (4, 0);
     cat_new (4, 4);
-    cat_new (4, 40);
-    cat_new (40, 0);    
-    cat_new (40, 4);
-    cat_new (40, 40);
-
-    apn_new (0, 0);
-    apn_new (0, 4);
-    apn_new (0, 40);
-    apn_new (4, 0);
-    apn_new (4, 4);
-    apn_new (4, 40);
-    apn_new (40, 0);    
-    apn_new (40, 4);
-    apn_new (40, 40);
+    cat_new (4, 32);
+    cat_new (32, 0);    
+    cat_new (32, 4);
+    cat_new (32, 32);
 
     cat_init (memcopy, 0, 0);
     cat_init (memcopy, 0, 4);
-    cat_init (memcopy, 0, 40);
+    cat_init (memcopy, 0, 32);
     cat_init (memcopy, 4, 0);
     cat_init (memcopy, 4, 4);
     cat_init (memcopy, 4, BUFFET_SSOMAX-4);
     cat_init (memcopy, 4, BUFFET_SSOMAX-3);
-    cat_init (memcopy, 4, 40);
-    cat_init (memcopy, 40, 0);
-    cat_init (memcopy, 40, 40);
-
-    apn_init (memcopy, 0, 0);
-    apn_init (memcopy, 0, 4);
-    apn_init (memcopy, 0, 40);
-    apn_init (memcopy, 4, 0);
-    apn_init (memcopy, 4, 4);
-    apn_init (memcopy, 4, BUFFET_SSOMAX-4);
-    apn_init (memcopy, 4, BUFFET_SSOMAX-3);
-    apn_init (memcopy, 4, 40);
-    apn_init (memcopy, 40, 0);
-    apn_init (memcopy, 40, 40);
+    cat_init (memcopy, 4, 32);
+    cat_init (memcopy, 32, 0);
+    cat_init (memcopy, 32, 32);
 
     cat_init (memview, 0, 0);
     cat_init (memview, 0, 4);
-    cat_init (memview, 0, 40);
+    cat_init (memview, 0, 32);
     cat_init (memview, 4, 0);
     cat_init (memview, 4, 4);
     cat_init (memview, 4, BUFFET_SSOMAX-4);
     cat_init (memview, 4, BUFFET_SSOMAX-3);
-    cat_init (memview, 4, 40);
-    cat_init (memview, 40, 0);
-    cat_init (memview, 40, 40);
-    
-    apn_init (memview, 0, 0);
-    apn_init (memview, 0, 4);
-    apn_init (memview, 0, 40);
-    apn_init (memview, 4, 0);
-    apn_init (memview, 4, 4);
-    apn_init (memview, 4, BUFFET_SSOMAX-4);
-    apn_init (memview, 4, BUFFET_SSOMAX-3);
-    apn_init (memview, 4, 40);
-    apn_init (memview, 40, 0);
-    apn_init (memview, 40, 40);
+    cat_init (memview, 4, 32);
+    cat_init (memview, 32, 0);
+    cat_init (memview, 32, 32);
     
     cat_view (0, 0);
     cat_view (0, 4);
-    cat_view (0, 40);
+    cat_view (0, 32);
     cat_view (4, 0);
     cat_view (4, 4);
     cat_view (4, 4);
     cat_view (4, BUFFET_SSOMAX-4);
     cat_view (4, BUFFET_SSOMAX-3);
-    cat_view (4, 40);
-    cat_view (40, 0);
-    cat_view (40, 40);
+    cat_view (4, 32);
+    cat_view (32, 0);
+    cat_view (32, 32);
+}
+
+//==============================================================================
+
+void uapn(Buffet *buf, size_t buflen, size_t len) {
+    size_t rc = bft_append (buf, alpha+buflen, len); 
+    size_t explen = buflen+len; 
+    assert_int(rc, explen); 
+    check_props(buf, 0, explen); 
+    bft_free(buf); 
+}
+
+#define apn_new(cap, len) {\
+    Buffet buf = bft_new(cap);\
+    uapn (&buf, 0, len); \
+}
+
+#define apn_init(op, buflen, len) {\
+    Buffet buf = bft_##op (alpha, buflen); \
+    uapn (&buf, buflen, len); \
+}
+
+#define apn_view(buflen, len) { \
+    Buffet src = bft_memcopy(alpha, buflen); \
+    Buffet ref = bft_view (&src, 0, buflen); \
+    uapn (&ref, buflen, len); \
+    bft_free(&src); \
+}
+
+#define apn_viewed(buflen, len, exprc) { \
+    Buffet buf = bft_memcopy(alpha, buflen); \
+    Buffet ref = bft_view (&buf, 0, buflen); \
+    /*bft_dbg(&buf);*/ \
+    size_t rc = bft_append (&buf, alpha+buflen, len); \
+    assert_int(rc, exprc); \
+    if (rc) check_props(&buf, 0, (buflen+len)); \
+    bft_free(&ref); \
+    bft_free(&buf); \
+}
+
+void append()
+{
+    apn_new (0, 0);
+    apn_new (0, 4);
+    apn_new (0, 32);
+    apn_new (4, 0);
+    apn_new (4, 4);
+    apn_new (4, 32);
+    apn_new (32, 0);    
+    apn_new (32, 4);
+    apn_new (32, 32);
+
+    apn_init (memcopy, 0, 0);
+    apn_init (memcopy, 0, 4);
+    apn_init (memcopy, 0, 32);
+    apn_init (memcopy, 4, 0);
+    apn_init (memcopy, 4, 4);
+    apn_init (memcopy, 4, BUFFET_SSOMAX-4);
+    apn_init (memcopy, 4, BUFFET_SSOMAX-3);
+    apn_init (memcopy, 4, 32);
+    apn_init (memcopy, 32, 0);
+    apn_init (memcopy, 32, 32);
+    
+    apn_init (memview, 0, 0);
+    apn_init (memview, 0, 4);
+    apn_init (memview, 0, 32);
+    apn_init (memview, 4, 0);
+    apn_init (memview, 4, 4);
+    apn_init (memview, 4, BUFFET_SSOMAX-4);
+    apn_init (memview, 4, BUFFET_SSOMAX-3);
+    apn_init (memview, 4, 32);
+    apn_init (memview, 32, 0);
+    apn_init (memview, 32, 32);
     
     apn_view (0, 0);
     apn_view (0, 4);
-    apn_view (0, 40);
+    apn_view (0, 32);
     apn_view (4, 0);
     apn_view (4, 4);
     apn_view (4, 4);
     apn_view (4, BUFFET_SSOMAX-4);
     apn_view (4, BUFFET_SSOMAX-3);
-    apn_view (4, 40);
-    apn_view (40, 0);
-    apn_view (40, 40);
+    apn_view (4, 32);
+    apn_view (32, 0);
+    apn_view (32, 32);
 
     apn_viewed (8, 4, 12);
-    apn_viewed (8, 40, 0); // would mutate
-    apn_viewed (BUFFET_SSOMAX+1, 40, (BUFFET_SSOMAX+1+40));
+    apn_viewed (8, 32, 0); // would mutate
+    apn_viewed (BUFFET_SSOMAX+1, 32, (BUFFET_SSOMAX+1+32));
 }
+
 
 //==============================================================================
 
@@ -432,12 +449,12 @@ void cat()
     size_t srclen = strlen(src);\
     size_t seplen = strlen(sep);\
     int cnt; \
-    Buffet* parts = buffet_split (src, srclen, sep, seplen, &cnt); \
-    Buffet joined = buffet_join (parts, cnt, sep, seplen); \
-    assert_str (buffet_data(&joined), src); \
-    assert_int (buffet_len(&joined), srclen); \
+    Buffet* parts = bft_split (src, srclen, sep, seplen, &cnt); \
+    Buffet joined = bft_join (parts, cnt, sep, seplen); \
+    assert_str (bft_data(&joined), src); \
+    assert_int (bft_len(&joined), srclen); \
     free(parts);\
-    buffet_free(&joined);\
+    bft_free(&joined);\
 }
 
 #define sploin(a,b,sep) \
@@ -469,75 +486,69 @@ void splitjoin()
 
 //=============================================================================
 
-#define check_free(buf, exprc) {\
-    bool rc = buffet_free(buf); \
-    assert_int (rc, exprc); \
-    if (exprc) check_zero(buf); \
+#define check_free(buf) {\
+    bft_free(buf); \
+    check_zero(buf); \
 }
 
 #define free_new(len) { \
-    Buffet buf = buffet_new (len); \
-    check_free(&buf, true); \
+    Buffet buf = bft_new (len); \
+    check_free(&buf); \
 }
 #define free_memcopy(len) { \
-    Buffet buf = buffet_memcopy (alpha, len); \
-    check_free(&buf, true); \
+    Buffet buf = bft_memcopy(alpha, len); \
+    check_free(&buf); \
 }
 #define free_memview(len) { \
-    Buffet buf = buffet_memview (alpha, len); \
-    check_free(&buf, true); \
+    Buffet buf = bft_memview (alpha, len); \
+    check_free(&buf); \
 }
 #define free_view(len) { \
-    Buffet own = buffet_memcopy (alpha, 40); \
-    Buffet ref = buffet_view (&own, 0, len); \
-    check_free(&ref, true); \
-    check_free(&own, true); \
+    Buffet own = bft_memcopy(alpha, 32); \
+    Buffet ref = bft_view (&own, 0, len); \
+    check_free(&ref); \
+    check_free(&own); \
 }
 #define free_copy(len) { \
-    Buffet own = buffet_memcopy (alpha, 40); \
-    Buffet cpy = buffet_copy (&own, 0, len); \
-    check_free(&cpy, true); \
-    check_free(&own, true); \
+    Buffet own = bft_memcopy(alpha, 32); \
+    Buffet cpy = bft_copy (&own, 0, len); \
+    check_free(&cpy); \
+    check_free(&own); \
 }
 
 #define double_free(len) { \
-    Buffet buf = buffet_memcopy (alpha, len); \
-    check_free(&buf, true); \
-    check_free(&buf, true); \
+    Buffet buf = bft_memcopy(alpha, len); \
+    check_free(&buf); \
+    check_free(&buf); \
 }
 #define double_free_ref(srclen, len) { \
-    Buffet src = buffet_memcopy (alpha, srclen); \
-    Buffet ref = buffet_view (&src, 0, len); \
-    check_free(&ref, true); \
-    check_free(&ref, true); \
-    check_free(&src, true); \
+    Buffet src = bft_memcopy(alpha, srclen); \
+    Buffet ref = bft_view (&src, 0, len); \
+    check_free(&ref); \
+    check_free(&ref); \
+    check_free(&src); \
 }
-#define free_alias(len, exp) { \
-    Buffet src = buffet_memcopy (alpha, len); \
+#define free_alias(len) { \
+    Buffet src = bft_memcopy(alpha, len); \
     Buffet alias = src; \
-    check_free(&src, true); \
-    check_free(&alias, exp); \
+    check_free(&src); \
+    check_free(&alias); \
 }
-#define free_ref_alias(len, freeref, freealias, freeown) { \
-    Buffet own = buffet_memcopy (alpha, 40); \
-    Buffet ref = buffet_view (&own, 0, len); \
+#define free_ref_alias(len) { \
+    Buffet own = bft_memcopy(alpha, 32); \
+    Buffet ref = bft_view (&own, 0, len); \
     Buffet alias = ref; \
-    check_free(&ref, freeref); \
-    check_free(&alias, freealias); \
-    check_free(&own, freeown); \
+    check_free(&ref); \
+    check_free(&alias); \
+    check_free(&own); \
 }
-#define free_own_before_view(len, freeown, freeref) { \
-    Buffet own = buffet_memcopy (alpha, 40); \
-    Buffet ref = buffet_view (&own, 0, len); \
-    check_free(&own, freeown); \
-    check_free(&ref, freeref); \
-}
-#define view_after_free(initlen) { \
-    Buffet src = buffet_memcopy (alpha, initlen); \
-    Buffet ref = buffet_view (&src, 0, initlen); \
-    buffet_free(&src); \
-    check_props(&ref, 0, initlen); \
-    buffet_free(&ref); \
+#define free_viewed(len, intact) { \
+    Buffet src = bft_memcopy(alpha, len); \
+    Buffet ref = bft_view (&src, 0, len); \
+    bft_free(&src); \
+    if(intact) check_props(&src, 0, len); \
+    else check_zero(&src); \
+    check_free(&ref); \
 }
 
 
@@ -545,44 +556,40 @@ void free_()
 {
     free_new(0)
     free_new(8)
-    free_new(40)
+    free_new(32)
     free_memcopy(0)
     free_memcopy(8)
-    free_memcopy(40)
+    free_memcopy(32)
     free_memview(0)
     free_memview(8)
-    free_memview(40)
+    free_memview(32)
     free_copy(0)
     free_copy(8)
-    free_copy(40)
+    free_copy(32)
     free_view(0)
     free_view(8)
-    free_view(40)
+    free_view(32)
 
     /**** danger ****/
 
     double_free(0);
     double_free(8);
-    double_free(40);
+    double_free(32);
 
     double_free_ref(8, 4);
-    double_free_ref(40, 8);
-    double_free_ref(40, 20);
+    double_free_ref(32, 8);
+    double_free_ref(32, 20);
 
-    free_alias(8, true);
-    free_alias(40, true);
-
-    view_after_free(8);
-    view_after_free(40);
+    free_alias(8);
+    free_alias(32);
     
-    free_own_before_view (0,  true, true)
-    free_own_before_view (8,  true, true)
-    free_own_before_view (40, true, true)
+    free_viewed (0, true)
+    free_viewed (8, true)
+    free_viewed (32, false)
 
-    free_ref_alias (0,  true, true, true)
-    free_ref_alias (8,  true, true, true)
-    free_ref_alias (40, true, true, true)
-
+    free_ref_alias (0)
+    free_ref_alias (8)
+    free_ref_alias (32)
 }
 
 //=============================================================================
@@ -598,7 +605,7 @@ void zero()
     assert (!strcmp(buf.sso.data, ""));
     assert (!buf.sso.len);
     assert (!buf.sso.refcnt);
-    assert (!buf.sso.tag);
+    assert (!buf.sso.tag); // better cmp to SSO tag.. make it public ?
 }
 
 //=============================================================================
@@ -606,13 +613,13 @@ void zero()
 #define RESET "\033[0m"
 
 #define run(name) \
-LOG(#name); \
+LOG("- " #name); \
 name(); \
 printf(GREEN "%s OK\n" RESET, #name); fflush(stdout); 
 
 int main()
 {
-    alpha = repeat(ALPHA64, alphalen);
+    repeatat(alpha, alphalen, ALPHA64);
     
     LOG("unit tests... ");
     run(zero);
@@ -623,6 +630,7 @@ int main()
     run(copy);
     run(view);
     run(cat);
+    run(append);
     run(splitjoin);
     run(free_);
     LOG(GREEN "unit tests OK" RESET);

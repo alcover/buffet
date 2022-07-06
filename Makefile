@@ -5,7 +5,7 @@ endif
 
 CC = gcc
 OPTIM = -O2
-WARN = -Wall -Wextra
+WARN = -Wall -Wextra -Wno-unused-function
 CP = $(CC) -std=c11 $(WARN) -g
 CPP = g++ -std=c++2a $(WARN) -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
@@ -18,7 +18,7 @@ check = bin/check
 bench =	bin/bench
 examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) bin/threadtest $(examples) $(bench)
+all: $(lib) $(asm) $(check) bin/threadtest $(examples) $(bench) README.md
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
@@ -61,6 +61,10 @@ bin/ex/%: src/ex/%.c $(lib)
 bin/threadtest: src/threadtest.c $(lib)
 	@ echo make $@
 	@ $(LINK) -lpthread
+
+README.md: src/README.tpl.md src/ex/schema.c src/ex/view.c
+	@ echo make $@
+	@ sed -e '/<schema.c>/{r src/ex/schema.c' -e 'd}' -e '/<view.c>/{r src/ex/view.c' -e 'd}' src/README.tpl.md > $@
 
 check:
 	@ ./$(check)

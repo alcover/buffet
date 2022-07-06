@@ -35,6 +35,16 @@ repeat (const char *pat, int totlen) {
     return ret;
 } 
 
+// repeat to static dest of capacity dstcap
+static void 
+repeatat (char *dst, size_t dstcap, const char *pat) {
+    int patlen = strlen(pat);
+    int n = (dstcap)/patlen;
+    *dst = 0;
+    for (int i = 0; i < n; ++i) strcat(dst, pat);
+    strncat(dst, pat, dstcap%patlen);
+} 
+
 static const char*
 load (const char* src_path, size_t* outlen)
 {

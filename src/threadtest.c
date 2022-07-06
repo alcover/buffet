@@ -27,14 +27,14 @@ Buffet buf;
 void* new(void *args)
 {
     int idx = *(int*)args;
-    buf = buffet_new(idx*10);
+    buf = bft_new(idx*10);
     return NULL;
 }
 
 void* memcopy(void *args)
 {
     int idx = *(int*)args;
-    buf = buffet_memcopy(srcs[idx], idx);
+    buf = bft_memcopy(srcs[idx], idx);
     return NULL;
 }
 
@@ -42,20 +42,20 @@ void* append(void *args)
 {
     int idx = *(int*)args;
     for (int i = 0; i < SRCLEN; ++i)
-        buffet_cat(&buf, &buf, srcs[idx], 1);
+        bft_cat(&buf, &buf, srcs[idx], 1);
     return NULL;
 }
 
 void* view(void *args)
 {
     int idx = *(int*)args;
-    bufs[idx] = buffet_view(&buf, 0, SRCLEN);
+    bufs[idx] = bft_view(&buf, 0, SRCLEN);
     return NULL;
 }
 
 int main(void) 
 {
-    // buf = buffet_new(20);
+    // buf = bft_new(20);
     pthread_t threads[NTHREADS];
 
     #define RUN(task) \
@@ -64,15 +64,15 @@ int main(void)
     for (int i = 0; i < NTHREADS; i++) \
         pthread_join (threads[i], NULL); \
     LOG (#task " done"); \
-    buffet_debug(&buf)
+    bft_dbg(&buf)
 
     // rem: almost no fail when run these first !?
     // RUN(new);
     // RUN(memcopy);
 
-    buf = buffet_new(0);
+    buf = bft_new(0);
     RUN(append);
-    int len = buffet_len(&buf);
+    int len = bft_len(&buf);
     int exp = NTHREADS*SRCLEN;
     if (len!=exp) {
         ERR("append fail : len=%d exp=%d\n", len, exp);
@@ -83,15 +83,12 @@ int main(void)
     // RUN(view);
     // for (int i = 0; i < NTHREADS; i++) {
     //     Buffet *b = &bufs[i];
-    //     // buffet_debug(b);
-    //     assert(buffet_len(b)==SRCLEN);
-    //     buffet_free(b);
+    //     // bft_dbg(b);
+    //     assert(bft_len(b)==SRCLEN);
+    //     bft_free(b);
     // }
 
-    int freed = buffet_free(&buf);
-    if (!freed) {
-        ERR("buf not freed");
-    }
+    bft_free(&buf);
     
     return 0;
 }

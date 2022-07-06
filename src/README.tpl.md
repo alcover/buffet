@@ -66,44 +66,8 @@ struct Store {
 ![schema](assets/schema.png)
 
 ```C
-#include "../buffet.h"
+<schema.c>
 
-int main() {
-
-// SHARED OWN ===================================
-
-    char large[] = "DATA STORE IS HEAP ALLOCATION.";
-
-    Buffet own1 = bft_memcopy(large, sizeof(large)-1);
-    // own1 points into a store holding a copy of `large`
-    bft_dbg(&own1);
-
-    // View "STORE" in own1
-    Buffet own2 = bft_view(&own1, 5, 5);
-    // Now own1 and own2 share the store, whose refcount is 2
-    bft_dbg(&own2);
-
-// SSO & SSV ===================================
-
-    char small[] = "SMALL STRING";
-
-    Buffet sso1 = bft_memcopy(small, sizeof(small)-1);
-    bft_dbg(&sso1);
-
-    // View "STRING" in sso1
-    Buffet ssv1 = bft_view(&sso1, 6, 6);
-    bft_dbg(&ssv1);
-
-// VUE =========================================
-
-    char data[] = "SOME BYTES";
-
-    // View "BYTES" in `data`
-    Buffet vue1 = bft_memview(data+5, 5);
-    bft_dbg(&vue1);
-
-    return 0;
-}
 ```
 
 ```
@@ -305,38 +269,8 @@ If the return is *OWN*, the target store won't be released before either
 - the return is detached by e.g. appending to it.
 
 ```C
-#include "../buffet.h"
+<view.c>
 
-int main() {
-
-    char text[] = "Bonjour monsieur Buddy. Already speaks french!";
-
-    // view sso
-    Buffet sso = bft_memcopy(text, 16); // "Bonjour monsieur"
-    Buffet ssv = bft_view(&sso, 0, 7);
-    bft_dbg(&ssv);
-
-    // view ssv
-    Buffet Bon = bft_view(&ssv, 0, 3);
-    bft_dbg(&Bon);
-
-    // view own
-    Buffet own = bft_memcopy(text, sizeof(text));
-    Buffet ownview = bft_view(&own, 0, 7);
-    bft_dbg(&ownview);
-
-    // detach view
-    bft_append (&ownview, "!", 1);
-    // bft_free(&ownview); 
-    bft_free(&own); // Done
-
-    // view vue
-    Buffet vue = bft_memview(text+8, 8); // "Good"
-    Buffet mon = bft_view(&vue, 0, 3);
-    bft_dbg(&mon);
-
-    return 0;
-}
 ```
 
 cc view.c libbuffet.a -o view && ./view

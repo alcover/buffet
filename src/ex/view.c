@@ -2,33 +2,31 @@
 
 int main() {
 
-	char text[] = "Bonjour monsieur Buddy. Already speaks french!";
+    char text[] = "Bonjour monsieur Buddy. Already speaks french!";
 
-	// view own
-	Buffet own = buffet_memcopy(text, sizeof(text));
-	Buffet Bonjour = buffet_view(&own, 0, 7);
-	buffet_debug(&Bonjour); // REF cstr:'Bonjour'
+    // view sso
+    Buffet sso = bft_memcopy(text, 16); // "Bonjour monsieur"
+    Buffet ssv = bft_view(&sso, 0, 7);
+    bft_dbg(&ssv);
 
-	// view ref
-	Buffet Bon = buffet_view(&Bonjour, 0, 3);
-	buffet_debug(&Bon); // REF cstr:'Bon'
+    // view ssv
+    Buffet Bon = bft_view(&ssv, 0, 3);
+    bft_dbg(&Bon);
 
-	// detach views
-	buffet_cat (&Bonjour, &Bonjour, "!", 1);
-	buffet_free(&Bon); 
-	buffet_free(&own); // OK
+    // view own
+    Buffet own = bft_memcopy(text, sizeof(text));
+    Buffet ownview = bft_view(&own, 0, 7);
+    bft_dbg(&ownview);
 
-	// view vue
-	Buffet vue = buffet_memview("Good day", 4); // "Good"
-	Buffet Goo = buffet_view(&vue, 0, 3);
-	buffet_debug(&Goo); // VUE cstr:'Goo'
+    // detach view
+    bft_append (&ownview, "!", 1);
+    // bft_free(&ownview); 
+    bft_free(&own); // Done
 
-	// view sso
-	Buffet sso = buffet_memcopy("Hello", 5);
-	Buffet Hell = buffet_view(&sso, 0, 4);
-	buffet_debug(&Hell); // VUE cstr:'Hell'
-	buffet_free(&Hell);	 // OK
-	buffet_free(&sso); 	 // OK
+    // view vue
+    Buffet vue = bft_memview(text+8, 8); // "Good"
+    Buffet mon = bft_view(&vue, 0, 3);
+    bft_dbg(&mon);
 
-	return 0;
+    return 0;
 }

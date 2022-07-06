@@ -3,4 +3,4 @@
 # check memory leaks of ./bin/arg
 # ex: to check src/example.c do `./checkleak example`
 
-valgrind --leak-check=full ./bin/$1
+clear && valgrind --leak-check=full --show-leak-kinds=all ./bin/$1
