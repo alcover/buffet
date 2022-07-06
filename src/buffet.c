@@ -313,9 +313,11 @@ bft_view (Buffet *src, size_t off, size_t len)
 
 /**
  * Discard a Buffet.
- * If the Buffet has views on it, the method aborts.
- * Otherwise it is zeroed-out, making it an empty SSO.
- * If it was a refcounted view, the target refcount is decremented.
+ * aborts if buf is an SSO with views
+ * otherwise, buf is zeroed-out, making it an empty SSO.
+ * if buf was a view, its target refcount is decremented.
+ * if buf was the last view on a store, the store is released.  
+ * 
  * @param[in] buf the target Buffet to discard
  */
 void
@@ -370,6 +372,8 @@ bft_free (Buffet *buf)
  * @param[in] src the byte array source
  * @param[in] srclen the source array length
  * @param[out] dst the destination Buffet
+ 
+todo copy append impl ?
 */
 size_t
 bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)

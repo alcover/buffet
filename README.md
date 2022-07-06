@@ -367,30 +367,39 @@ Buffet alias = vue; //ok
 
 ### bft_free
 
-    bool bft_free (Buffet *buf)
+    void bft_free (Buffet *buf)
 
 Discards *buf*.  
-If *buf* was the last reference to a store, the store is released.  
 
-Returns *true* and zeroes-out *buf* into an empty *SSO* if all good.  
-Returns *true* also on double-free or aliasing.  
-Returns *false* otherwise. E.g when *buf* is owning data with live views.
+- aborts if buf is an SSO with views
+- otherwise, buf is zeroed-out, making it an empty SSO.
+- if buf was a view, its target refcount is decremented.
+- if buf was the last view on a store, the store is released.  
+
+Security:
+- being zeroed, a double-free has no ill consequence
+- in case of aliasing (not recommended), the store checks on an OWN prevent use after free
+
 
 ```C
-char text[] = "Le grand orchestre";
+char text[] = "Le grand orchestre de Patato Valdez";
 
 Buffet own = bft_memcopy(text, sizeof(text));
 Buffet ref = bft_view(&own, 9, 9); // "orchestre"
+bft_free(&own); // A bit soon but ok, --refcnt
+bft_dbg(&own);  // SSO 0 ""
+bft_free(&ref); // Was last co-owner, store is released
 
-// Too soon but marked for release
-bft_free(&own);
-
-// Was last ref, data gets actually released
-bft_free(&ref);
+Buffet sso = bft_memcopy(text, 8); // "Le grand"
+Buffet ref2 = bft_view(&sso, 3, 5); // "grand"
+bft_free(&sso); // WARN line:328 bft_free: SSO has views on it
+bft_free(&ref2);
+bft_free(&sso); // OK now
+bft_dbg(&sso);  // SSO 0 ""
 ```
 
 ```
-$ valgrind  --leak-check=full ./app
+$ valgrind  --leak-check=full ./bin/ex/free
 All heap blocks were freed -- no leaks are possible
 ```
 
