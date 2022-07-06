@@ -17,7 +17,7 @@ Todo: thread safety
 
 [**API**](#API)  
 <!-- ![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg) -->
----
+
 
 ## Layout
 
@@ -94,30 +94,30 @@ NB: The lib is not much optimized and the bench maybe amateurish.
 On a weak Thinkpad :  
 <pre>
 MEMVIEW_cpp/8                1 ns          1 ns 1000000000
-MEMVIEW_buffet/8             7 ns          7 ns  104415720
-MEMCOPY_c/8                 17 ns         17 ns   41830269
-MEMCOPY_buffet/8            12 ns         12 ns   59247229
-MEMCOPY_c/32                16 ns         16 ns   43570320
-MEMCOPY_buffet/32           27 ns         27 ns   25163547
-MEMCOPY_c/128               17 ns         17 ns   40026449
-MEMCOPY_buffet/128          30 ns         30 ns   23095880
-MEMCOPY_c/512               28 ns         28 ns   24853494
-MEMCOPY_buffet/512          41 ns         41 ns   17088140
-MEMCOPY_c/2048              88 ns         88 ns    7830930
-MEMCOPY_buffet/2048        103 ns        103 ns    6742238
-MEMCOPY_c/8192             200 ns        200 ns    3506685
-MEMCOPY_buffet/8192        285 ns        285 ns    2465464
-APPEND_cpp/8/4              13 ns         13 ns   52540255
-APPEND_buffet/8/4           32 ns         32 ns   22170370
-APPEND_cpp/8/16             34 ns         34 ns   20799950
-APPEND_buffet/8/16          30 ns         30 ns   23268211
-APPEND_cpp/24/4             49 ns         49 ns   14320572
-APPEND_buffet/24/4          31 ns         31 ns   22816902
-APPEND_cpp/24/32            48 ns         48 ns   12567113
-APPEND_buffet/24/32         30 ns         30 ns   23280076
-SPLITJOIN_c               3006 ns       3006 ns     233361
-SPLITJOIN_cpp             3388 ns       3388 ns     206760
-SPLITJOIN_buffet          1451 ns       1451 ns     480339
+MEMVIEW_buffet/8             7 ns          7 ns  103101477
+MEMCOPY_c/8                 17 ns         17 ns   41771438
+MEMCOPY_buffet/8            12 ns         12 ns   59136008
+MEMCOPY_c/32                16 ns         16 ns   44280093
+MEMCOPY_buffet/32           27 ns         27 ns   25569904
+MEMCOPY_c/128               17 ns         17 ns   41047431
+MEMCOPY_buffet/128          31 ns         31 ns   22837310
+MEMCOPY_c/512               28 ns         28 ns   25499520
+MEMCOPY_buffet/512          45 ns         45 ns   15477668
+MEMCOPY_c/2048              94 ns         94 ns    7401330
+MEMCOPY_buffet/2048        110 ns        110 ns    6405395
+MEMCOPY_c/8192             199 ns        199 ns    3509839
+MEMCOPY_buffet/8192        284 ns        284 ns    2461398
+APPEND_cpp/8/4              12 ns         12 ns   57633324
+APPEND_buffet/8/4           22 ns         22 ns   32506683
+APPEND_cpp/8/16             32 ns         32 ns   21765849
+APPEND_buffet/8/16          30 ns         30 ns   23278437
+APPEND_cpp/24/4             48 ns         48 ns   14586050
+APPEND_buffet/24/4          31 ns         31 ns   22807349
+APPEND_cpp/24/32            47 ns         47 ns   14982967
+APPEND_buffet/24/32         29 ns         29 ns   24023279
+SPLITJOIN_c               2913 ns       2913 ns     240557
+SPLITJOIN_cpp             3128 ns       3128 ns     223070
+SPLITJOIN_buffet          1431 ns       1431 ns     487453
 </pre>
 
 
@@ -127,8 +127,9 @@ Buffet aims at preventing memory faults, including from user.
 (Except of course losing scope and such.)  
 
 
-(pseudo code)
 ```C
+// (pseudo code)
+
 // overflow
 Buffet buf = bft_new(8)
 bft_append(buf, longstr) // Done
@@ -171,7 +172,6 @@ If they're wrong, the operation aborts and possibly returns an empty buffet.
 
 See *src/check.c* unit-tests and warnings output.
 
----
 
 # API
 
@@ -226,7 +226,7 @@ Buffet copy = bft_memcopy("Bonjour", 3);
 
 Create a new Buffet viewing *len* bytes from *src*.  
 You get a window into *src* without copy or allocation.  
-NB: You shouldn't directly *memview* a Buffet's *data*. Use *view()*
+NB: You shouldn't directly *memview* a Buffet's data. Use *view()*
 
 ```C
 char src[] = "Eat Buffet!";
@@ -238,14 +238,12 @@ Buffet view = bft_memview(src+4, 6);
 
     Buffet bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
 
-
 Copy *len* bytes of Buffet *src*, starting at *off*.  
 
 
 ### bft_view
 
     Buffet bft_view (Buffet *src, ptrdiff_t off, size_t len)
-
 
 View *len* bytes of Buffet *src*, starting at *off*.  
 You get a window into *src* without copy or allocation.  
@@ -256,7 +254,6 @@ The return internal type depends on *src* type :
 - `view(SSV) -> SSV` on *src*'s target
 - `view(OWN) -> OWN` (as refcounted store co-owner)
 - `view(VUE) -> VUE` on *src*'s target
-
 
 If the return is *OWN*, the target store won't be released before either  
 - the return is discarded by *bft_free*
@@ -298,7 +295,6 @@ Buffet alias = own; //not refcounted
 Buffet alias = vue; //ok
 ```
 
-
 ### bft_free
 
     void bft_free (Buffet *buf)
@@ -313,7 +309,6 @@ Discards *buf*.
 Security:
 - being zeroed, a double-free has no ill consequence
 - in case of aliasing (not recommended), the store checks on an OWN prevent use after free
-
 
 ```C
 char text[] = "Le grand orchestre de Patato Valdez";
@@ -337,8 +332,6 @@ $ valgrind  --leak-check=full ./bin/ex/free
 All heap blocks were freed -- no leaks are possible
 ```
 
-
-
 ### bft_cat
 
     size_t bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t len)
@@ -353,7 +346,6 @@ size_t totlen = bft_cat(&dst, &buf, "def", 3);
 bft_dbg(&dst);
 // SSO 6 "abcdef"
 ```
-
 
 ### bft_append
 
@@ -381,8 +373,6 @@ assert(rc==0); // meaning aborted
 
 To prevent this, release views before appending to a small buffet.  
 
-
-
 ### bft_split
 
     Buffet* bft_split (const char* src, size_t srclen, const char* sep, size_t seplen, 
@@ -408,7 +398,6 @@ for (int i=0; i<cnt; ++i)
 free(parts);
 ```
 
-
 ### bft_join
 
     Buffet bft_join (Buffet *list, int cnt, const char* sep, size_t seplen);
@@ -422,7 +411,6 @@ Buffet back = bft_join(parts, cnt, " ", 1);
 bft_dbg(&back);
 // SSO 8 'Split me'
 ```
-
 
 ### bft_cap  
 
@@ -474,3 +462,10 @@ bft_memcopy(&buf, "foo", 3);
 bft_dbg(&buf);
 // SSO 3 "foo"
 ```
+
+### TODO
+
+- equal()
+- write(), sprintf()
+- resize()
+- sso auto-release like own ?

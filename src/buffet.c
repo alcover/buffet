@@ -116,11 +116,6 @@ dbg (const Buffet* buf)
     size_t len = getlen(buf,tag);
     
     LOG("%s %zu \"%.*s\"", stag, len, (int)len, data);
-
-    // if (tag==OWN) {
-    //     Store *store = getstore(buf);
-    //     dbgstore(store);
-    // }
 }
 
 //============================================================================
@@ -552,7 +547,6 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
                     ERR("append realloc\n");
                     return 0;
                 }
-                // buf->ptr.data = store->data;
                 writer = store->data + writeoff;
                 goto appn;
             }
@@ -776,7 +770,6 @@ bft_cstr (const Buffet *buf, bool *mustfree)
     } else if (tag==SSO) {
         ret = (char*)buf->sso.data;
     } else {
-        // size_t len = buf->ptr.len;
         const char *data = buf->ptr.data;
         if (data[len]==0) {
             ret = (char*)data;
