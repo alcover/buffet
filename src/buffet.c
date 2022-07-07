@@ -45,7 +45,7 @@ getlen (const Buffet *buf, Tag tag) {
 
 static inline Store*
 getstore (const Buffet *buf) {
-    return (Store*)(buf->ptr.data - buf->ptr.off - DATAOFF);
+    return (Store*)(buf->ptr.data - (DATAOFF + buf->ptr.off));
 }
 
 static inline Store*
@@ -219,7 +219,7 @@ bft_copyall (const Buffet *src)
 
 /**
  * Create a shallow copy of a Buffet.
- * Use this instead of aliasing a Buffet.
+ * Use this instead of aliasing a Buffet with `alias = buf`.
  * Only an SSO gets its data actually copied.
  * @param[in] src the source Buffet
  */
@@ -289,7 +289,8 @@ bft_view (Buffet *src, size_t off, size_t len)
             Store *store = getstore(src);
 
             if (store->canary != CANARY) {
-                ERR_CANARY; return ZERO;
+                ERR_CANARY;
+                return ZERO;
             }
 
             ++ store->refcnt; 
@@ -342,9 +343,10 @@ bft_free (Buffet *buf)
         }
 
     } else if (tag==SSV) {
-
+        // check ? No, fault would be user losing scope
+        // plus SSO has no canary..
         BuffetSSO *target = (BuffetSSO*)(buf->ptr.data - buf->ptr.off);
-        -- target->refcnt; //check?
+        -- target->refcnt;
     }
 
     // memset(buf, 0, sizeof(Buffet));
@@ -367,8 +369,6 @@ bft_free (Buffet *buf)
  * @param[in] src the byte array source
  * @param[in] srclen the source array length
  * @param[out] dst the destination Buffet
- 
-todo copy append impl ?
 */
 size_t
 bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
@@ -376,20 +376,22 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
     if (dst==buf) return bft_append((Buffet*)buf, src, srclen);
 
     Tag tag = TAG(buf);
-    char *curdata;
-    char *dstdata = NULL;
+    const char *curdata;
+    char *writer = NULL;
     Store *store = NULL;
     size_t curlen;
     size_t newlen;
     size_t writeoff = 0;
+    bool ssofit = false;
 
     if (tag == SSO) {
 
         curdata = (char*)buf->sso.data;
         curlen = buf->sso.len;
         newlen = curlen + srclen;
+        ssofit = (newlen <= BUFFET_SSOMAX);
 
-        if (newlen <= BUFFET_SSOMAX) {
+        if (ssofit) {
 
             Buffet out = *buf;
             memcpy(out.sso.data + curlen, src, srclen);
@@ -406,6 +408,7 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
         curlen = buf->ptr.len;
         newlen = curlen + srclen;
         writeoff = buf->ptr.off + curlen;
+        ssofit = (newlen <= BUFFET_SSOMAX);
 
         // todo decide if downsized owner (unique) could convert to SSO
         // if (newlen <= BUFFET_SSOMAX) {}
@@ -422,20 +425,41 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
                 && (alone || writeoff == store->len)) {
 
                 //LOG("cat OWN: inplace");
-                dstdata = store->data + writeoff;
-                memcpy(dstdata, src, srclen);
-                dstdata[srclen] = 0;
+                writer = store->data + writeoff;
+                memcpy(writer, src, srclen);
+                writer[srclen] = 0;
                 store->len = writeoff+srclen;
                 *dst = *buf;
-                dst->ptr.len = newlen;
                 ++ store->refcnt;
+                dst->ptr.len = newlen;
+
                 return newlen;
             }
         }
 
-        // rem: could realloc store if alone (like append())
-        // but implies mutable buf arg
         // if (alone) {}
+            // rem: could realloc store like in append()
+            // but implies mutable buf arg
+
+    } // end case ptr
+
+    if (ssofit) {
+
+        // assert(tag!=SSO);
+        LOG("ssofit");
+        *dst = (Buffet){
+            .sso.refcnt = 0,
+            .sso.len = newlen,
+            .sso.tag = SSO
+        };
+
+        writer = dst->sso.data;
+        memcpy(writer, curdata, curlen);
+        writer += curlen;
+        memcpy(writer, src, srclen);
+        writer[srclen] = 0;
+
+        return newlen;
     }
 
     store = newstore(OVERALLOC*newlen, newlen);
@@ -445,14 +469,12 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
         return 0;
     }
 
-    // copy current data
-    dstdata = store->data;
-    memcpy(dstdata, curdata, curlen);
-    dstdata += curlen;
-
-    // append new data
-    memcpy(dstdata, src, srclen);
-    dstdata[srclen] = 0;
+    // copy data
+    writer = store->data;
+    memcpy(writer, curdata, curlen);
+    writer += curlen;
+    memcpy(writer, src, srclen);
+    writer[srclen] = 0;
 
     *dst = (Buffet){
         .ptr.data = store->data,
@@ -583,7 +605,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
     if (ssofit) {
 
         // assert(tag!=SSO);
-        // LOG("ssofit");
+        LOG("ssofit");
         TAG(buf) = SSO;
         buf->sso.len = newlen;
         buf->sso.refcnt = 0;

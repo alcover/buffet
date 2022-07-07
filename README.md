@@ -16,8 +16,8 @@ Todo: thread safety
 
 
 [**API**](#API)  
-<!-- ![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg) -->
 
+![CI](https://github.com/alcover/buffet/actions/workflows/ci.yml/badge.svg)
 
 ## Layout
 
@@ -529,9 +529,20 @@ bft_dbg(&buf);
 // SSO 3 "foo"
 ```
 
-### TODO
+## TODO
+
+- ! views : decide clearly if r/o + CoW or writable
+- store.len :  not updated when tailing view is detached..  
+We lose future in-place optimization.  
+Maybe record second to last range ?
+- store checks : too many ?  
+Decide user responsabilty on mis-handling.  
+Add #define ENABLE_MEMCHECKS
+- SSO auto-release like own ?
+- test 32-bit and small RAM
+
+#### API
 
 - equal()
 - write(), sprintf()
 - resize()
-- sso auto-release like own ?
