@@ -71,7 +71,7 @@ Buffet* bft_split (const char* src, size_t srclen,
                    const char* sep, size_t seplen, int *outcnt);
 Buffet* bft_splitstr (const char *src, const char *sep, int *outcnt);
 
-bool    bft_equal (const Buffet *a, const Buffet *b);
+int     bft_cmp (const Buffet *a, const Buffet *b);
 size_t  bft_cap (const Buffet *buf);
 size_t  bft_len (const Buffet *buf);
 const char* bft_data (const Buffet *buf);

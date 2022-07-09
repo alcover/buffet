@@ -779,15 +779,28 @@ bft_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
  * @param[in] b the second Buffet
  * @return boolean true if a and b have the same data
  */
-bool
-bft_equal (const Buffet *a, const Buffet *b)
+int
+bft_cmp (const Buffet *a, const Buffet *b)
 {
+    if (a==b) return 0;
+
     Tag taga = TAG(a);
     Tag tagb = TAG(b);
     size_t lena = getlen(a, taga);
     size_t lenb = getlen(b, tagb);
-    // optim: compare ptrs first ?
-    return (lena==lenb) && !strcmp(getdata(a,taga), getdata(b,tagb));
+    intmax_t lendiff = lena-lenb; //?
+    const char *dataa = getdata(a, taga);
+    const char *datab = getdata(b, tagb);
+
+    if (!lendiff) {
+        if (dataa==datab) return 0;
+        return memcmp(dataa, datab, lena);
+    }
+    
+    size_t minlen = (lendiff<0) ? lena : lenb;
+    int cmp = memcmp(dataa, datab, minlen);
+    if (cmp) return cmp;
+    return lendiff;
 }
 
 

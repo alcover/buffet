@@ -402,9 +402,9 @@ bft_dbg(&back);
 // SSO 8 'Split me'
 ```
 
-### bft_equal
+### bft_cmp
 
-    bool bft_equal (const Buffet *a, const Buffet *b)
+    int bft_cmp (const Buffet *a, const Buffet *b)
 
 Compare two buffets' data. Lengths are compared first.
 

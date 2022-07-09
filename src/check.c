@@ -594,44 +594,50 @@ void free_()
 
 //=============================================================================
 
-#define uequal_memop(op, lena, lenb, exp) { \
+#define assert_cmp(a, b, exp) \
+int cmp = bft_cmp(a, b); \
+if (cmp) cmp = cmp/abs(cmp); /*exp = abs(exp);*/ \
+assert_int(cmp, exp);
+
+
+#define ucmp_memop(op, lena, lenb, exp) { \
     Buffet a = bft_##op(alpha, lena); \
     Buffet b = bft_##op(alpha, lenb); \
-    assert_int(bft_equal(&a, &b), exp); \
+    assert_cmp(&a, &b, exp); \
     bft_free(&a); \
     bft_free(&b); \
 }
 
-#define uequal_view(len, exp) { \
+#define ucmp_view(len, exp) { \
     Buffet buf = bft_memcopy(alpha, len); \
     Buffet view = bft_view(&buf, 0, len); \
-    assert_int(bft_equal(&view, &buf), exp); \
+    assert_int (!!bft_cmp(&view, &buf), !!exp); \
     bft_free(&view); \
     bft_free(&buf); \
 }
 
-void equal()
+void cmp()
 {
-    uequal_memop(memcopy, 0, 0, true);
-    uequal_memop(memcopy, 1, 1, true);
-    uequal_memop(memcopy, 8, 8, true);
-    uequal_memop(memcopy, 32, 32, true);
-    uequal_memop(memcopy, 1, 2, false);
-    uequal_memop(memcopy, 8, 9, false);
-    uequal_memop(memcopy, 32, 33, false); 
+    ucmp_memop(memcopy, 0, 0, 0);
+    ucmp_memop(memcopy, 1, 1, 0);
+    ucmp_memop(memcopy, 8, 8, 0);
+    ucmp_memop(memcopy, 32, 32, 0);
+    ucmp_memop(memcopy, 1, 2, -1);
+    ucmp_memop(memcopy, 8, 9, -1);
+    ucmp_memop(memcopy, 32, 33, -1); 
 
-    uequal_memop(memview, 0, 0, true);
-    uequal_memop(memview, 1, 1, true);
-    uequal_memop(memview, 8, 8, true);
-    uequal_memop(memview, 32, 32, true);
-    uequal_memop(memview, 1, 2, false);
-    uequal_memop(memview, 8, 9, false);
-    uequal_memop(memview, 32, 33, false);
+    ucmp_memop(memview, 0, 0, 0);
+    ucmp_memop(memview, 1, 1, 0);
+    ucmp_memop(memview, 8, 8, 0);
+    ucmp_memop(memview, 32, 32, 0);
+    ucmp_memop(memview, 1, 2, -1);
+    ucmp_memop(memview, 8, 9, -1);
+    ucmp_memop(memview, 32, 33, -1);
 
-    uequal_view(0, true);
-    uequal_view(1, true);
-    uequal_view(8, true);
-    uequal_view(32, true);
+    ucmp_view(0, 0);
+    ucmp_view(1, 0);
+    ucmp_view(8, 0);
+    ucmp_view(32, 0);
 
     // todo other combins
 }
@@ -677,7 +683,7 @@ int main()
     run(append);
     run(splitjoin);
     run(free_);
-    run(equal);
+    run(cmp);
     LOG(GREEN "unit tests OK" RESET);
 
     return 0;
