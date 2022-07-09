@@ -593,6 +593,50 @@ void free_()
 }
 
 //=============================================================================
+
+#define uequal_memop(op, lena, lenb, exp) { \
+    Buffet a = bft_##op(alpha, lena); \
+    Buffet b = bft_##op(alpha, lenb); \
+    assert_int(bft_equal(&a, &b), exp); \
+    bft_free(&a); \
+    bft_free(&b); \
+}
+
+#define uequal_view(len, exp) { \
+    Buffet buf = bft_memcopy(alpha, len); \
+    Buffet view = bft_view(&buf, 0, len); \
+    assert_int(bft_equal(&view, &buf), exp); \
+    bft_free(&view); \
+    bft_free(&buf); \
+}
+
+void equal()
+{
+    uequal_memop(memcopy, 0, 0, true);
+    uequal_memop(memcopy, 1, 1, true);
+    uequal_memop(memcopy, 8, 8, true);
+    uequal_memop(memcopy, 32, 32, true);
+    uequal_memop(memcopy, 1, 2, false);
+    uequal_memop(memcopy, 8, 9, false);
+    uequal_memop(memcopy, 32, 33, false); 
+
+    uequal_memop(memview, 0, 0, true);
+    uequal_memop(memview, 1, 1, true);
+    uequal_memop(memview, 8, 8, true);
+    uequal_memop(memview, 32, 32, true);
+    uequal_memop(memview, 1, 2, false);
+    uequal_memop(memview, 8, 9, false);
+    uequal_memop(memview, 32, 33, false);
+
+    uequal_view(0, true);
+    uequal_view(1, true);
+    uequal_view(8, true);
+    uequal_view(32, true);
+
+    // todo other combins
+}
+
+//=============================================================================
 void zero()
 {
     Buffet buf = BUFFET_ZERO;
@@ -633,6 +677,7 @@ int main()
     run(append);
     run(splitjoin);
     run(free_);
+    run(equal);
     LOG(GREEN "unit tests OK" RESET);
 
     return 0;

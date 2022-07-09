@@ -773,6 +773,25 @@ bft_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
 
 
 /**
+ * Compare two buffets' data. Lengths are compared first.
+ * 
+ * @param[in] a the first Buffet
+ * @param[in] b the second Buffet
+ * @return boolean true if a and b have the same data
+ */
+bool
+bft_equal (const Buffet *a, const Buffet *b)
+{
+    Tag taga = TAG(a);
+    Tag tagb = TAG(b);
+    size_t lena = getlen(a, taga);
+    size_t lenb = getlen(b, tagb);
+    // optim: compare ptrs first ?
+    return (lena==lenb) && !strcmp(getdata(a,taga), getdata(b,tagb));
+}
+
+
+/**
  * Get a Buffet data as a null-terminated C string of length buf.len.
  * 
  * @param[in] buf the Buffet source

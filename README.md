@@ -74,10 +74,9 @@ int main() {
 
     char large[] = "DATA STORE IS HEAP ALLOCATION.";
 
+    // own1 will own a store holding a copy of `large`
     Buffet own1 = bft_memcopy(large, sizeof(large)-1);
-    // own1 points into a store holding a copy of `large`
     bft_dbg(&own1);
-
     // View "STORE" in own1
     Buffet own2 = bft_view(&own1, 5, 5);
     // Now own1 and own2 share the store, whose refcount is 2
@@ -89,17 +88,16 @@ int main() {
 
     Buffet sso1 = bft_memcopy(small, sizeof(small)-1);
     bft_dbg(&sso1);
-
     // View "STRING" in sso1
     Buffet ssv1 = bft_view(&sso1, 6, 6);
     bft_dbg(&ssv1);
 
 // VUE =========================================
 
-    char data[] = "SOME BYTES";
+    char any[] = "SOME BYTES";
 
-    // View "BYTES" in `data`
-    Buffet vue1 = bft_memview(data+5, 5);
+    // View "BYTES" in `any`
+    Buffet vue1 = bft_memview(any+5, 5);
     bft_dbg(&vue1);
 
     return 0;
@@ -127,7 +125,7 @@ While extensive, unit tests may not yet cover all cases.
 `make && make bench` (requires *libbenchmark-dev*)  
 
 NB: The lib is not much optimized and the bench maybe amateurish.  
-On a weak Thinkpad :  
+On a weak Core i3 :  
 <pre>
 MEMVIEW_cpp/8                1 ns          1 ns 1000000000
 MEMVIEW_buffet/8             7 ns          7 ns  103101477
@@ -193,17 +191,7 @@ bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
 
 ```
 
-To achieve this, heap stores are controlled by a header :
-
-    struct Store {
-        cap
-        len
-        refcnt
-        canary
-        data[]
-    }
-
-On operations like *view*, *append* or *free*, we check the store's canary and refcount.    
+To achieve this, on operations like *view*, *append* or *free*, we check the store's canary and refcount.    
 If they're wrong, the operation aborts and possibly returns an empty buffet.  
 
 See *src/check.c* unit-tests and warnings output.
@@ -367,14 +355,14 @@ Buffet alias = vue; //ok
 
 Discards *buf*.  
 
-- aborts if buf is an SSO with views
-- otherwise, buf is zeroed-out, making it an empty SSO.
+- aborts if buf is an SSO with views.
+- otherwise, buf is zeroed into an empty SSO.
 - if buf was a view, its target refcount is decremented.
 - if buf was the last view on a store, the store is released.  
 
 Security:
-- being zeroed, a double-free has no ill consequence
-- in case of aliasing (not recommended), the store checks on an OWN prevent use after free
+- the zeroing makes double-free harmless.
+- the only problematic use-after-free would be of a OWN alias (not recommended), but the store management prevents stale memory access.
 
 ```C
 char text[] = "Le grand orchestre de Patato Valdez";
@@ -478,6 +466,12 @@ bft_dbg(&back);
 // SSO 8 'Split me'
 ```
 
+### bft_equal
+
+    bool bft_equal (const Buffet *a, const Buffet *b)
+
+Compare two buffets' data. Lengths are compared first.
+
 ### bft_cap  
 
     size_t bft_cap (Buffet *buf)
@@ -501,14 +495,14 @@ To ensure null-termination at `buf.len`, use *bft_cstr*.
 
     const char* bft_cstr (const Buffet *buf, bool *mustfree)
 
-Get current data as a null-terminated C string of length `buf.len`.  
-If needed (when *buf* is a view), the slice is copied into a fresh C string that must be freed if *mustfree* is set.
+Get current data as a null-terminated C string of max length `buf.len`.  
+If needed (when *buf* is a view), the data is copied into a new C string that must be freed if *mustfree* is set.
 
 ### bft_export
 
     char* bft_export (const Buffet *buf)
 
- Copies data up to `buf.len` into a fresh C string that must be freed.
+ Copies data up to `buf.len` into a new C string that must be freed.
 
 ### bft_print
 
@@ -543,6 +537,5 @@ Add #define ENABLE_MEMCHECKS
 
 #### API
 
-- equal()
 - write(), sprintf()
 - resize()
