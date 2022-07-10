@@ -196,7 +196,7 @@ SPLITJOIN_buffet          1431 ns       1431 ns     487453
 [bft_new](#bft_new)  
 [bft_memcopy](#bft_memcopy)  
 [bft_memview](#bft_memview)  
-[bft_copy](#bft_copy)
+[bft_copy](#bft_copy)  
 [bft_copyall](#bft_copyall)  
 [bft_view](#bft_view)  
 [bft_dup](#bft_dup)  (don't alias buffets, use this)  
@@ -206,6 +206,7 @@ SPLITJOIN_buffet          1431 ns       1431 ns     487453
 [bft_join](#bft_join)  
 [bft_free](#bft_free)  
 
+[bft_cmp](#bft_cmp)  
 [bft_cap](#bft_cap)  
 [bft_len](#bft_len)  
 [bft_data](#bft_data)  
