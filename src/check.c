@@ -659,13 +659,11 @@ void zero()
 }
 
 //=============================================================================
-#define GREEN "\033[32;1m"
-#define RESET "\033[0m"
 
 #define run(name) \
-LOG("- " #name); \
+LOG("%.20s", #name " *******************"); \
 name(); \
-printf(GREEN "%s OK\n" RESET, #name); fflush(stdout); 
+LOG("%s OK", #name); 
 
 int main()
 {
@@ -684,7 +682,7 @@ int main()
     run(splitjoin);
     run(free_);
     run(cmp);
-    LOG(GREEN "unit tests OK" RESET);
+    LOG("unit tests OK");
 
     return 0;
 }

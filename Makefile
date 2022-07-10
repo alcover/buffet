@@ -1,4 +1,4 @@
-# `make dbg=1` to enable asserts
+# `make dbg=1` to enable asserts & logging
 ifndef dbg
 	DEBUG = -DNDEBUG
 endif
@@ -37,7 +37,7 @@ endif
 $(check): src/check.c $(lib)
 	@ echo make $@
 	@ $(CP) -O0 $^ -o $@ -Wno-unused-function
-# 	@ ./$@
+	@ ./$@
 
 LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 
@@ -62,17 +62,18 @@ bin/threadtest: src/threadtest.c $(lib)
 	@ echo make $@
 	@ $(LINK) -lpthread
 
-README.md: src/README.tpl.md src/ex/schema.c src/ex/view.c
+README.md: src/README.tpl.md src/ex/*
 	@ echo make $@
-	@ sed -e '/<schema.c>/{r src/ex/schema.c' -e 'd}' -e '/<view.c>/{r src/ex/view.c' -e 'd}' src/README.tpl.md > $@
+	@ sed -e '/<schema.c>/{r src/ex/schema.c' -e 'd}' \
+		  -e '/<view.c>/{r src/ex/view.c' -e 'd}' \
+		  -e '/<free.c>/{r src/ex/free.c' -e 'd}' \
+		  src/README.tpl.md > $@
 
 check:
 	@ ./$(check)
 
 bench: 
-	@ ./$(bench) \
-	--benchmark_color=false \
-	--benchmark_format=console
+	@ ./$(bench) --benchmark_color=false --benchmark_format=console
 
 clean:
 	@ rm -rf bin/*

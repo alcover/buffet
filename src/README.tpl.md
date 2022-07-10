@@ -6,12 +6,12 @@
 
 Experimental string buffer featuring
 
-- **SSO** (small string optimization) inline short data inside the type.
+- **SSO** (small string optimization) inline short data into the type.
 - **views** (or 'slices') no-copy references to sub-strings.
 - **refcount** (reference counting) account for views before mutation or release.
 - automated allocations
 
-Aims at [**security**](#Security) with decent [**speed**](#Speed).  
+Aims at [**security**](#Security) with decent [**speed**](#Bench).  
 Todo: thread safety
 
 
@@ -24,7 +24,7 @@ Todo: thread safety
 Buffet is a tagged union with 4 modes.  
 
 ```C
-// Hard values illustrate 64-bit
+// Hard values show 64-bit
 
 union Buffet {
     struct ptr {
@@ -48,14 +48,14 @@ The *tag* sets a Buffet's mode :
 - `SSV` : (small string view) view on an SSO
 - `VUE` : non-owning view on any data
 
-In *OWN* mode, *Buffet.data* points into an allocated heap store.
+In OWN mode, *Buffet.data* points into an allocated heap store.
 
 ```C
 struct Store {
     size_t   cap    // store capacity
-    size_t   len    // store active length
-    uint32_t refcnt // number of views on the store
-    uint32_t canary // invalidates the store if modified
+    size_t   len    // store length
+    uint32_t refcnt // number of views on store
+    uint32_t canary // invalidates store if modified
     char     data[] // buffer data, shared by owning views
 }
 ```
@@ -67,26 +67,56 @@ struct Store {
 
 ```C
 <schema.c>
-
-```
-
-```
-$ cc schema.c libbuffet.a -o schema && ./schema
-OWN 30 "DATA STORE IS HEAP ALLOCATION."
-OWN 5 "STORE"
-SSO 12 "SMALL STRING"
-SSV 6 "STRING"
-VUE 5 "BYTES"
 ```
 
 
 ### Build & check
 
-`make && make check`
+    make && make check
 
 While extensive, unit tests may not yet cover all cases.
 
-### Speed
+
+### Security
+
+Buffet aims at preventing memory faults, including from user.  
+(Except of course losing scope and such.)  
+
+```C
+// (pseudo code)
+
+// overflow
+Buffet buf = bft_new(8)
+bft_append(buf, large_str) // Done
+
+// invalid ref
+Buffet buf = bft_memcopy(short_str)
+Buffet view = bft_view(buf)
+bft_append(buf, large_str) // would mutate SSO buf into OWN
+// Abort + warning "Append would invalidate views on SSO"
+
+// double-free
+bft_free(buf)
+bft_free(buf) // OK
+
+// use-after-free
+bft_free(buf)
+bft_append(buf, "foo") // Done. Now buf is "foo".
+
+// aliasing
+Buffet alias = buf // should be `alias = bft_dup(buf)`
+bft_free(buf)
+bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
+
+// Etc...
+```
+
+To this end, operations like *view* or *free* may check the store's canary and refcount and abort if wrong, possibly returning an empty buffet.  
+
+See *src/check.c* unit-tests and warnings output.
+
+
+### Bench
 
 `make && make bench` (requires *libbenchmark-dev*)  
 
@@ -121,54 +151,13 @@ SPLITJOIN_buffet          1431 ns       1431 ns     487453
 </pre>
 
 
-### Security
-
-Buffet aims at preventing memory faults, including from user.  
-(Except of course losing scope and such.)  
-
-
-```C
-// (pseudo code)
-
-// overflow
-Buffet buf = bft_new(8)
-bft_append(buf, longstr) // Done
-
-// dangling ref
-Buffet buf = bft_memcopy(shortstr)
-Buffet view = bft_view(buf)
-bft_append(buf, longstr) // would mutate buf into an OWN
-// warning: "Append would invalidate views on SSO"
-
-// double-free
-bft_free(buf)
-bft_free(buf) // OK
-
-// use-after-free
-bft_free(buf)
-bft_append(buf, "foo") // Done. Now buf="foo".
-
-// aliasing
-Buffet alias = buf // should instead be `alias = bft_dup(buf)`
-bft_free(buf)
-bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
-
-// Etc...
-
-```
-
-To achieve this, on operations like *view*, *append* or *free*, we check the store's canary and refcount.    
-If they're wrong, the operation aborts and possibly returns an empty buffet.  
-
-See *src/check.c* unit-tests and warnings output.
-
-
 # API
 
 [bft_new](#bft_new)  
 [bft_memcopy](#bft_memcopy)  
 [bft_memview](#bft_memview)  
-[bft_copy](#bft_copy)  
+[bft_copy](#bft_copy)
+[bft_copyall](#bft_copyall)  
 [bft_view](#bft_view)  
 [bft_dup](#bft_dup)  (don't alias buffets, use this)  
 [bft_append](#bft_append)  
@@ -228,7 +217,20 @@ Buffet view = bft_memview(src+4, 6);
 
     Buffet bft_copy (const Buffet *src, ptrdiff_t off, size_t len)
 
-Copy *len* bytes of Buffet *src*, starting at *off*.  
+Copy *len* bytes at offset *off* from Buffet *src* into a new Buffet.  
+
+```C
+Buffet src = bft_memcopy("Bonjour", 7);
+Buffet cpy = bft_copy(&src, 3, 4);
+// SSO 4 "jour"
+```
+
+
+### bft_copyall
+
+    Buffet bft_copyall (const Buffet *src)
+
+Copy all bytes from Buffet *src* into a new Buffet.
 
 
 ### bft_view
@@ -245,7 +247,7 @@ The return internal type depends on *src* type :
 - `view(OWN) -> OWN` (as refcounted store co-owner)
 - `view(VUE) -> VUE` on *src*'s target
 
-If the return is *OWN*, the target store won't be released before either  
+If the return is OWN, the target store won't be released before either  
 - the return is discarded by *bft_free*
 - the return is detached by e.g. appending to it.
 
@@ -301,20 +303,7 @@ Security:
 - the only problematic use-after-free would be of a OWN alias (not recommended), but the store management prevents stale memory access.
 
 ```C
-char text[] = "Le grand orchestre de Patato Valdez";
-
-Buffet own = bft_memcopy(text, sizeof(text));
-Buffet ref = bft_view(&own, 9, 9); // "orchestre"
-bft_free(&own); // A bit soon but ok, --refcnt
-bft_dbg(&own);  // SSO 0 ""
-bft_free(&ref); // Was last co-owner, store is released
-
-Buffet sso = bft_memcopy(text, 8); // "Le grand"
-Buffet ref2 = bft_view(&sso, 3, 5); // "grand"
-bft_free(&sso); // WARN line:328 bft_free: SSO has views on it
-bft_free(&ref2);
-bft_free(&sso); // OK now
-bft_dbg(&sso);  // SSO 0 ""
+<free.c>
 ```
 
 ```
@@ -406,7 +395,7 @@ bft_dbg(&back);
 
     int bft_cmp (const Buffet *a, const Buffet *b)
 
-Compare two buffets' data. Lengths are compared first.
+Compare two buffets' data using `memcmp`. Lengths are compared first.
 
 ### bft_cap  
 

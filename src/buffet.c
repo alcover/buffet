@@ -30,8 +30,8 @@ typedef struct {
 #define STOREMEM(cap) (DATAOFF+(cap)+1) // alloc for store of capacity `cap`
 
 #define ERR_ALLOC ERR("Failed allocation\n")
-#define ERR_CANARY WARN("Bad canary. Double free ?\n")
-#define ERR_REFCNT WARN("Bad refcnt. Rogue alias ?\n")
+#define WARN_CANARY WARN("Bad canary. Double free ?\n")
+#define WARN_REFCNT WARN("Bad refcnt. Alias ?\n")
 
 static inline char*
 getdata (const Buffet *buf, Tag tag) {
@@ -96,9 +96,9 @@ newssovue (Buffet *src, size_t len, size_t off)
 static void 
 dbgstore (const Store *store) 
 {
-    const char *data = store->data;
-    LOG("store: cap:%zu refcnt:%d data:\"%.*s\"", 
-        store->cap, store->refcnt, (int)(store->len +1), data);
+    printf("store: cap:%zu refcnt:%d data:\"%.*s\"", 
+        store->cap, store->refcnt, (int)(store->len +1), store->data);
+    fflush(stdout);
 }
 
 static void 
@@ -115,7 +115,8 @@ dbg (const Buffet* buf)
     char *data = getdata(buf,tag);
     size_t len = getlen(buf,tag);
     
-    LOG("%s %zu \"%.*s\"", stag, len, (int)len, data);
+    printf("%s %zu \"%.*s\"", stag, len, (int)len, data);
+    fflush(stdout);
 }
 
 //============================================================================
@@ -289,7 +290,7 @@ bft_view (Buffet *src, size_t off, size_t len)
             Store *store = getstore(src);
 
             if (store->canary != CANARY) {
-                ERR_CANARY;
+                WARN_CANARY;
                 return ZERO;
             }
 
@@ -330,9 +331,9 @@ bft_free (Buffet *buf)
             
         Store *store = getstore(buf);
         if (store->canary != CANARY) {
-            ERR_CANARY;
+            WARN_CANARY;
         } else if (!store->refcnt) {
-            ERR_REFCNT;
+            WARN_REFCNT;
         } else {
             -- store->refcnt;
             if (!store->refcnt) {
@@ -605,7 +606,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
     if (ssofit) {
 
         // assert(tag!=SSO);
-        LOG("ssofit");
+        // LOG("ssofit");
         TAG(buf) = SSO;
         buf->sso.len = newlen;
         buf->sso.refcnt = 0;
