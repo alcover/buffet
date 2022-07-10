@@ -774,11 +774,11 @@ bft_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
 
 
 /**
- * Compare two buffets' data. Lengths are compared first.
+ * Compare two buffets' data using memcmp. Lengths are compared first.
  * 
  * @param[in] a the first Buffet
  * @param[in] b the second Buffet
- * @return boolean true if a and b have the same data
+ * @return same logic as memcmp : 0 if equal, signed bytes diff otherwise
  */
 int
 bft_cmp (const Buffet *a, const Buffet *b)
