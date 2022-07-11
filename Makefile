@@ -7,7 +7,7 @@ CC = gcc
 OPTIM = -O2
 WARN = -Wall -Wextra -Wno-unused-function
 CP = $(CC) -std=c11 $(WARN) -g
-CPP = g++ -std=c++20 -fpermissive -g
+CPP = g++ -std=c++2a -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin/ex)
