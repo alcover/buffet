@@ -2,7 +2,7 @@
 
 int main() {
     
-//==== SHARED OWN =================
+// SHARED OWN =================
 
     char large[] = "DATA STORE IS HEAP ALLOCATION.";
 
@@ -16,7 +16,7 @@ int main() {
     bft_dbg(&own2); 
     //-> OWN 5 "STORE"
 
-//==== SSO & SSV =================
+// SSO & SSV =================
 
     char small[] = "SMALL STRING";
 
@@ -28,7 +28,7 @@ int main() {
     bft_dbg(&ssv1); 
     //-> SSV 6 "STRING"
 
-//==== VUE =======================
+// VUE =======================
 
     char any[] = "SOME BYTES";
 

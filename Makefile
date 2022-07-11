@@ -7,7 +7,7 @@ CC = gcc
 OPTIM = -O2
 WARN = -Wall -Wextra -Wno-unused-function
 CP = $(CC) -std=c11 $(WARN) -g
-CPP = g++ -std=c++2a $(WARN) -fpermissive -g
+CPP = g++ -std=c++20 -fpermissive -g
 LINK = $(CP) $(OPTIM) $^ -o $@
 
 $(shell mkdir -p bin/ex)
@@ -45,7 +45,8 @@ LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 $(bench): src/bench.cpp $(lib) bin/utilcpp
 	@ echo make $@
 ifdef LIBBENCHMARK
-	@ $(CPP) $(OPTIM) -w -lbenchmark -lpthread $^ -o $@
+# 	@ $(CPP) -o $@ $(OPTIM) -lpthread -w -lbenchmark $^
+	$(CPP) $(OPTIM) -o $@ $^ -lbenchmark -lpthread
 else
 	@ echo libbenchmark not installed
 endif

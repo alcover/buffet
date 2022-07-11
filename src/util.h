@@ -28,7 +28,7 @@ static char*
 repeat (const char *pat, int totlen) {
     int patlen = strlen(pat);
     int n = totlen/patlen;
-    char *ret = calloc(totlen+1, 1);
+    char *ret = (char*)calloc(totlen+1, 1);
     for (int i = 0; i < n; ++i) strcat(ret, pat);
     strncat(ret, pat, totlen%patlen);
     // ret[len] = 0;
@@ -77,17 +77,19 @@ splitlen (const char* src, size_t srclen, const char* sep, size_t seplen,
 {
     #define LOCAL_MEM 1024
     #define LOCAL_MAX (LOCAL_MEM/sizeof(char*))
-    int curcnt = 0; 
-    char **ret = NULL;
-    
-    char*  parts_local[LOCAL_MAX]; 
-    char** parts = parts_local;
+
+    char *parts_local[LOCAL_MAX]; 
+    char **parts = parts_local;
+    char *parts_alloc = NULL; // avoid annoying 'ret local var' warning
     bool local = true;
+    char *part = NULL;
     int partsmax = LOCAL_MAX;
 
     const char *beg = src;
     const char *end = src;
     size_t len;
+    int curcnt = 0; 
+    char **ret = NULL;
 
     while ((end = strstr(end, sep))) {
 
@@ -97,18 +99,20 @@ splitlen (const char* src, size_t srclen, const char* sep, size_t seplen,
             size_t newsz = partsmax * sizeof(char*);
 
             if (local) {
-                parts = malloc(newsz); 
+                parts = (char**)malloc(newsz); 
                 if (!parts) {curcnt = 0; goto fin;}
                 memcpy (parts, parts_local, curcnt * sizeof(char*));
                 local = false;
+                parts_alloc = (char*)parts;
             } else {
-                parts = realloc(parts, newsz); 
+                parts = (char**)realloc(parts, newsz); 
                 if (!parts) {curcnt = 0; goto fin;}
             }
         }
+
         #define TOLIST \
         len = end-beg; \
-        char *part = malloc(len+1); \
+        part = (char*)malloc(len+1); \
         memcpy(part, beg, len); \
         part[len] = 0; \
         parts[curcnt++] = part;
@@ -123,19 +127,20 @@ splitlen (const char* src, size_t srclen, const char* sep, size_t seplen,
     TOLIST
 
     if (local) {
-        ret = malloc(curcnt * sizeof(char*));
+        ret = (char**)malloc(curcnt * sizeof(char*));
         memcpy (ret, parts, curcnt * sizeof(char*));
     } else {
-        ret = parts;  
+        ret = (char**)parts_alloc;  
     }
-
-    fin:
-    *outcnt = curcnt;
-    return ret;
 
     #undef TOLIST
     #undef LOCAL_MAX
     #undef LOCAL_MEM
+
+    fin:
+    *outcnt = curcnt;
+
+    return ret;
 }
 
 char**
@@ -148,7 +153,7 @@ char*
 joinlen (char** parts, int cnt, const char* sep, size_t seplen)
 {
     // opt: local if small; none if too big
-    size_t *lengths = malloc(cnt*sizeof(*lengths));
+    size_t *lengths = (size_t*)malloc(cnt*sizeof(*lengths));
     size_t totlen = 0;
 
     for (int i=0; i < cnt; ++i) {
@@ -158,7 +163,7 @@ joinlen (char** parts, int cnt, const char* sep, size_t seplen)
     }
     totlen += (cnt-1)*seplen;
     
-    char* ret = malloc(totlen+1);
+    char* ret = (char*)malloc(totlen+1);
     ret[totlen] = 0; 
     char* cur = ret;
 

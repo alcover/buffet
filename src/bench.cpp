@@ -41,7 +41,7 @@ MEMCOPY_c (benchmark::State& state)
     GETLEN
 
     for (auto _ : state) {
-        char *buf = malloc(len+1);
+        char *buf = (char*)malloc(len+1);
         benchmark::DoNotOptimize(buf);
         memcpy(buf, alpha, len);
         benchmark::DoNotOptimize(buf[len] = 0);
@@ -132,7 +132,7 @@ SPLITJOIN_c (benchmark::State& state)
         const char* ret = join(parts, cnt, sep);
 
         // assert(!strcmp(ret, SPLITME));
-        free(ret);
+        free((void*)ret);
         for (int i = 0; i < cnt; ++i) free(parts[i]);
         free(parts);
     }
@@ -146,7 +146,7 @@ SPLITJOIN_cpp (benchmark::State& state)
         const char* ret = join_cppview(parts, sep);
 
         // assert(!strcmp(ret, SPLITME));
-        free(ret);
+        free((void*)ret);
     }
 }
 

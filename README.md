@@ -43,12 +43,12 @@ sizeof(Buffet) == 24
 ```
 The *tag* sets a Buffet's mode :  
 
-- `OWN` : co-owning slice of a store
-- `SSO` : embedded char array
-- `SSV` : (small string view) view on an SSO
-- `VUE` : non-owning view on any data
+- `OWN`  co-owning slice of a store
+- `SSO`  embedded char array
+- `SSV`  (small string view) view on an SSO
+- `VUE`  non-owning view on any data
 
-In OWN mode, *Buffet.data* points into an allocated heap store.
+If OWN, *Buffet.data* points into an allocated heap store :
 
 ```C
 struct Store {
@@ -70,7 +70,7 @@ struct Store {
 
 int main() {
     
-//==== SHARED OWN =================
+// SHARED OWN =================
 
     char large[] = "DATA STORE IS HEAP ALLOCATION.";
 
@@ -84,7 +84,7 @@ int main() {
     bft_dbg(&own2); 
     //-> OWN 5 "STORE"
 
-//==== SSO & SSV =================
+// SSO & SSV =================
 
     char small[] = "SMALL STRING";
 
@@ -96,7 +96,7 @@ int main() {
     bft_dbg(&ssv1); 
     //-> SSV 6 "STRING"
 
-//==== VUE =======================
+// VUE =======================
 
     char any[] = "SOME BYTES";
 
@@ -151,7 +151,8 @@ bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
 // Etc...
 ```
 
-To this end, operations like *view* or *free* may check the store's canary and refcount and abort if wrong, possibly returning an empty buffet.  
+To this end, operations like *view* or *free* may check the store's canary and refcount.  
+If wrong, the operation aborts and returns an empty buffet.  
 
 See *src/check.c* unit-tests and warnings output.
 
@@ -161,6 +162,7 @@ See *src/check.c* unit-tests and warnings output.
 `make && make bench` (requires *libbenchmark-dev*)  
 
 NB: The lib is not much optimized and the bench maybe amateurish.  
+
 On a weak Core i3 :  
 <pre>
 MEMVIEW_cpp/8                1 ns          1 ns 1000000000
@@ -486,7 +488,7 @@ bft_dbg(&back);
 
     int bft_cmp (const Buffet *a, const Buffet *b)
 
-Compare two buffets' data using `memcmp`. Lengths are compared first.
+Compare two buffets' data using `memcmp`.
 
 ### bft_cap  
 

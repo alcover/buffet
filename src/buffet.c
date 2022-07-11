@@ -661,6 +661,7 @@ bft_split (const char* src, size_t srclen, const char* sep, size_t seplen,
     
     Buffet parts_local[LIST_STACK_MAX]; 
     Buffet *parts = parts_local;
+    Buffet *parts_alloc = NULL; // avoid annoying 'ret local var' warning
     bool local = true;
     int partsmax = LIST_STACK_MAX;
 
@@ -679,6 +680,7 @@ bft_split (const char* src, size_t srclen, const char* sep, size_t seplen,
                 if (!parts) {curcnt = 0; goto fin;}
                 memcpy(parts, parts_local, curcnt * sizeof(Buffet));
                 local = false;
+                parts_alloc = parts;
             } else {
                 parts = realloc(parts, newsz); 
                 if (!parts) {curcnt = 0; goto fin;}
@@ -698,11 +700,12 @@ bft_split (const char* src, size_t srclen, const char* sep, size_t seplen,
         ret = malloc(outlen);
         memcpy(ret, parts, outlen);
     } else {
-        ret = parts;  
+        ret = parts_alloc;  
     }
 
     fin:
     *outcnt = curcnt;
+
     return ret;
 }
 
@@ -774,7 +777,7 @@ bft_join (const Buffet *parts, int cnt, const char* sep, size_t seplen)
 
 
 /**
- * Compare two buffets' data using memcmp. Lengths are compared first.
+ * Compare two buffets' data using memcmp.
  * 
  * @param[in] a the first Buffet
  * @param[in] b the second Buffet
@@ -801,6 +804,7 @@ bft_cmp (const Buffet *a, const Buffet *b)
     size_t minlen = (lendiff<0) ? lena : lenb;
     int cmp = memcmp(dataa, datab, minlen);
     if (cmp) return cmp;
+
     return lendiff;
 }
 
