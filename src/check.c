@@ -1,3 +1,7 @@
+#ifdef NDEBUG
+#undef NDEBUG
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -6,9 +10,6 @@
 #include "log.h"
 #include "util.h"
 
-#ifdef NDEBUG
-#undef NDEBUG
-#endif
 
 #define alphalen (128)
 char alpha[alphalen+1];
@@ -148,11 +149,11 @@ void memview()
     bft_free(&src); \
 }
 
-#define dup_view(srclen, len) { \
+#define dup_view(srclen, viewlen) { \
     Buffet src = bft_memcopy(alpha, srclen); \
-    Buffet ref = bft_view(&src, 0, len); \
+    Buffet ref = bft_view(&src, 0, viewlen); \
     Buffet buf = bft_dup(&ref); \
-    check_props(&buf, 0, len); \
+    check_props(&buf, 0, viewlen); \
     bft_free(&buf); \
     bft_free(&ref); \
     bft_free(&src); \
@@ -243,13 +244,14 @@ fun (srclen, srclen, 1);    /* bad off */ \
 fun (srclen, srclen+1, 0);  /* bad off */ \
 fun (srclen, srclen+1, 1);  /* bad off */ \
 
-#define view_alias_after_free(initlen) { \
-    Buffet src = bft_memcopy(alpha, initlen); \
-    Buffet alias = src; \
-    bft_free(&src);     \
-    Buffet ref = bft_view (&alias, 0, initlen); \
-    check_props(&ref, 0, 0); \
-    bft_free(&ref);  \
+void view_own_alias_after_free() { 
+    Buffet src = bft_memcopy(alpha, 32); 
+    Buffet alias = src; 
+    bft_free(&src); 
+    Buffet ref = bft_view (&alias, 0, 32); 
+    // bft_dbg(&ref); 
+    check_props(&ref, 0, 0); 
+    bft_free(&ref);  
 }
 
 void view() 
@@ -271,8 +273,9 @@ void view()
     VIEWCASES (view_view, 8)
     VIEWCASES (view_view, 32)
     
-    // view_alias_after_free(8); // useless. SSO alias is copy.
-    view_alias_after_free(32);
+    #if MEMCHECK 
+    view_own_alias_after_free();
+    #endif 
 }
 
 //==============================================================================
@@ -363,32 +366,53 @@ void uapn(Buffet *buf, size_t buflen, size_t len) {
     bft_free(buf); 
 }
 
-#define apn_new(cap, len) {\
+#define apn_new(cap, apnlen) {\
     Buffet buf = bft_new(cap);\
-    uapn (&buf, 0, len); \
+    uapn (&buf, 0, apnlen); \
 }
 
-#define apn_init(op, buflen, len) {\
-    Buffet buf = bft_##op (alpha, buflen); \
-    uapn (&buf, buflen, len); \
+#define apn_init(op, initlen, apnlen) {\
+    Buffet buf = bft_##op (alpha, initlen); \
+    uapn (&buf, initlen, apnlen); \
 }
 
-#define apn_view(buflen, len) { \
-    Buffet src = bft_memcopy(alpha, buflen); \
-    Buffet ref = bft_view (&src, 0, buflen); \
-    uapn (&ref, buflen, len); \
+#define apn_to_view(initlen, apnlen) { \
+    Buffet src = bft_memcopy(alpha, initlen); \
+    Buffet ref = bft_view (&src, 0, initlen); \
+    uapn (&ref, initlen, apnlen); \
     bft_free(&src); \
 }
 
-#define apn_viewed(buflen, len, exprc) { \
-    Buffet buf = bft_memcopy(alpha, buflen); \
-    Buffet ref = bft_view (&buf, 0, buflen); \
+#define apn_viewed(initlen, apnlen, exprc) { \
+    Buffet buf = bft_memcopy(alpha, initlen); \
+    Buffet ref = bft_view (&buf, 0, initlen); \
     /*bft_dbg(&buf);*/ \
-    size_t rc = bft_append (&buf, alpha+buflen, len); \
+    size_t rc = bft_append (&buf, alpha+initlen, apnlen); \
     assert_int(rc, exprc); \
-    if (rc) check_props(&buf, 0, (buflen+len)); \
+    if (rc) check_props(&buf, 0, (initlen+apnlen)); \
     bft_free(&ref); \
     bft_free(&buf); \
+}
+
+#define apn_alias(initlen) { \
+    Buffet buf = bft_memcopy(alpha, initlen); \
+    Buffet alias = buf; \
+    bft_append (&buf, alpha, 8); \
+    check_props(&alias, 0, initlen); \
+    bft_free(&buf); \
+    bft_free(&alias); \
+}
+
+
+#define apn_detach_alias() { \
+    Buffet buf = bft_memcopy(alpha, 32); \
+    Buffet ref = bft_view (&buf, 0, 16); /*refc==2*/ \
+    Buffet alias = ref; \
+    bft_append (&alias, alpha, 8); /*detach refc==1*/ \
+    bft_append (&ref, alpha+16, 16); /*refc==0*/ \
+    bft_dbg(&buf); \
+    bft_free(&buf); \
+    bft_free(&ref); \
 }
 
 void append()
@@ -425,21 +449,26 @@ void append()
     apn_init (memview, 32, 0);
     apn_init (memview, 32, 32);
     
-    apn_view (0, 0);
-    apn_view (0, 4);
-    apn_view (0, 32);
-    apn_view (4, 0);
-    apn_view (4, 4);
-    apn_view (4, 4);
-    apn_view (4, BUFFET_SSOMAX-4);
-    apn_view (4, BUFFET_SSOMAX-3);
-    apn_view (4, 32);
-    apn_view (32, 0);
-    apn_view (32, 32);
+    apn_to_view (0, 0);
+    apn_to_view (0, 4);
+    apn_to_view (0, 32);
+    apn_to_view (4, 0);
+    apn_to_view (4, 4);
+    apn_to_view (4, 4);
+    apn_to_view (4, BUFFET_SSOMAX-4);
+    apn_to_view (4, BUFFET_SSOMAX-3);
+    apn_to_view (4, 32);
+    apn_to_view (32, 0);
+    apn_to_view (32, 32);
 
     apn_viewed (8, 4, 12);
     apn_viewed (8, 32, 0); // would mutate
     apn_viewed (BUFFET_SSOMAX+1, 32, (BUFFET_SSOMAX+1+32));
+
+    #if MEMCHECK
+    apn_alias(32);
+    #endif
+    apn_detach_alias();
 }
 
 
@@ -491,62 +520,61 @@ void splitjoin()
     check_zero(buf); \
 }
 
-#define free_new(len) { \
-    Buffet buf = bft_new (len); \
+#define free_new(initlen) { \
+    Buffet buf = bft_new (initlen); \
     check_free(&buf); \
 }
-#define free_memcopy(len) { \
-    Buffet buf = bft_memcopy(alpha, len); \
+#define free_memcopy(initlen) { \
+    Buffet buf = bft_memcopy(alpha, initlen); \
     check_free(&buf); \
 }
-#define free_memview(len) { \
-    Buffet buf = bft_memview (alpha, len); \
+#define free_memview(initlen) { \
+    Buffet buf = bft_memview (alpha, initlen); \
     check_free(&buf); \
 }
-#define free_view(len) { \
+#define free_view(viewlen) { \
     Buffet own = bft_memcopy(alpha, 32); \
-    Buffet ref = bft_view (&own, 0, len); \
+    Buffet ref = bft_view (&own, 0, viewlen); \
     check_free(&ref); \
     check_free(&own); \
 }
-#define free_copy(len) { \
+#define free_copy(copylen) { \
     Buffet own = bft_memcopy(alpha, 32); \
-    Buffet cpy = bft_copy (&own, 0, len); \
+    Buffet cpy = bft_copy (&own, 0, copylen); \
     check_free(&cpy); \
     check_free(&own); \
 }
-
-#define double_free(len) { \
-    Buffet buf = bft_memcopy(alpha, len); \
+#define double_free(initlen) { \
+    Buffet buf = bft_memcopy(alpha, initlen); \
     check_free(&buf); \
     check_free(&buf); \
 }
-#define double_free_ref(srclen, len) { \
+#define double_free_ref(srclen, reflen) { \
     Buffet src = bft_memcopy(alpha, srclen); \
-    Buffet ref = bft_view (&src, 0, len); \
+    Buffet ref = bft_view (&src, 0, reflen); \
     check_free(&ref); \
     check_free(&ref); \
     check_free(&src); \
 }
-#define free_alias(len) { \
-    Buffet src = bft_memcopy(alpha, len); \
+#define free_alias(initlen) { \
+    Buffet src = bft_memcopy(alpha, initlen); \
     Buffet alias = src; \
     check_free(&src); \
     check_free(&alias); \
 }
-#define free_ref_alias(len) { \
+#define free_ref_alias(reflen) { \
     Buffet own = bft_memcopy(alpha, 32); \
-    Buffet ref = bft_view (&own, 0, len); \
+    Buffet ref = bft_view (&own, 0, reflen); \
     Buffet alias = ref; \
     check_free(&ref); \
     check_free(&alias); \
     check_free(&own); \
 }
-#define free_viewed(len, intact) { \
-    Buffet src = bft_memcopy(alpha, len); \
-    Buffet ref = bft_view (&src, 0, len); \
+#define free_viewed(initlen, intact) { \
+    Buffet src = bft_memcopy(alpha, initlen); \
+    Buffet ref = bft_view (&src, 0, initlen); \
     bft_free(&src); \
-    if(intact) check_props(&src, 0, len); \
+    if(intact) check_props(&src, 0, initlen); \
     else check_zero(&src); \
     check_free(&ref); \
 }
@@ -581,7 +609,10 @@ void free_()
     double_free_ref(32, 20);
 
     free_alias(8);
+    #if MEMCHECK 
     free_alias(32);
+    #endif 
+
     
     free_viewed (0, true)
     free_viewed (8, true)
@@ -608,9 +639,9 @@ assert_int(cmp, exp);
     bft_free(&b); \
 }
 
-#define ucmp_view(len, exp) { \
-    Buffet buf = bft_memcopy(alpha, len); \
-    Buffet view = bft_view(&buf, 0, len); \
+#define ucmp_view(initlen, exp) { \
+    Buffet buf = bft_memcopy(alpha, initlen); \
+    Buffet view = bft_view(&buf, 0, initlen); \
     assert_int (!!bft_cmp(&view, &buf), !!exp); \
     bft_free(&view); \
     bft_free(&buf); \
@@ -654,14 +685,14 @@ void zero()
 
     assert (!strcmp(buf.sso.data, ""));
     assert (!buf.sso.len);
-    assert (!buf.sso.refcnt);
+    assert (!buf.sso.rfc);
     assert (!buf.sso.tag); // better cmp to SSO tag.. make it public ?
 }
 
 //=============================================================================
 
 #define run(name) \
-LOG("> " #name); \
+LOG("%.16s",  "> " #name " ================"); \
 name(); \
 LOG("%s OK", #name); 
 

@@ -126,14 +126,14 @@ Buffet aims at preventing memory faults, including from user.
 // (pseudo code)
 
 // overflow
-Buffet buf = bft_new(8)
-bft_append(buf, large_str) // Done
+buf = new(8)
+append(buf, large_str) // Done
 
 // invalid ref
-Buffet buf = bft_memcopy(short_str)
-Buffet view = bft_view(buf)
-bft_append(buf, large_str) // would mutate SSO buf into OWN
-// Abort + warning "Append would invalidate views on SSO"
+buf = memcopy(short_str) // SSO
+view = view(buf)
+append(buf, large_str) // would mutate SSO to OWN
+// => abort & warn "Append would invalidate views on SSO"
 
 // double-free
 bft_free(buf)
@@ -141,18 +141,36 @@ bft_free(buf) // OK
 
 // use-after-free
 bft_free(buf)
-bft_append(buf, "foo") // Done. Now buf is "foo".
+append(buf, "foo") // Done. Now buf is "foo".
 
 // aliasing
-Buffet alias = buf // should be `alias = bft_dup(buf)`
+alias = buf // should be `alias = bft_dup(buf)`
 bft_free(buf)
 bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
 
 // Etc...
 ```
 
-To this end, operations like *view* or *free* may check the store's canary and refcount.  
+To this end, operations like *view()* or *free()* may check the store's header.  
 If wrong, the operation aborts and returns an empty buffet.  
+
+Checks are enabled by #defining MEMCHECKS or building with  
+    MEMCHECKS=1 make
+
+Warnings are enabled by #defining DEBUG or building with  
+    DEBUG=1 make
+
+NB: Even with checks, some aliasing can be fatal.  
+
+```C
+own = memcopy(large_str)
+view = view(own)
+alias = view
+bft_free(view)
+bft_free(own) // refcnt == 0, free(store) !
+// alias now points into freed memory...
+```
+
 
 See *src/check.c* unit-tests and warnings output.
 

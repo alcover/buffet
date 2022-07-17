@@ -1,6 +1,12 @@
-# `make dbg=1` to enable asserts & logging
-ifndef dbg
+ifdef DEBUG
+	DEBUG =
+else
 	DEBUG = -DNDEBUG
+endif
+
+ifdef MEMCHECK
+	MEMCHECK = -DMEMCHECK
+$(info MEMCHECK enabled)
 endif
 
 CC = gcc
@@ -16,13 +22,13 @@ lib = bin/libbuffet.a
 asm = bin/libbuffet.s
 check = bin/check
 bench =	bin/bench
-examples := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
+ex := $(patsubst src/ex/%.c,bin/ex/%,$(wildcard src/ex/*.c))
 
-all: $(lib) $(asm) $(check) bin/threadtest $(examples) $(bench) README.md
+all: $(lib) $(check) $(ex) $(bench) README.md #$(asm) bin/threadtest
 
 $(lib): src/buffet.c src/buffet.h
 	@ echo make $@
-	@ $(CP) $(DEBUG) $(OPTIM) -c $< -o $@
+	@ $(CP) $(DEBUG) $(MEMCHECK) $(OPTIM) -c $< -o $@
 
 OBJDUMP := $(shell objdump -v 2>/dev/null)
 
@@ -36,7 +42,7 @@ endif
 
 $(check): src/check.c $(lib)
 	@ echo make $@
-	@ $(CP) -O0 $^ -o $@ -Wno-unused-function
+	@ $(CP) $(MEMCHECK) -O0 $^ -o $@ -Wno-unused-function
 	@ ./$@
 
 LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
@@ -45,8 +51,7 @@ LIBBENCHMARK := $(shell /sbin/ldconfig -p | grep libbenchmark 2>/dev/null)
 $(bench): src/bench.cpp $(lib) bin/utilcpp
 	@ echo make $@
 ifdef LIBBENCHMARK
-# 	@ $(CPP) -o $@ $(OPTIM) -lpthread -w -lbenchmark $^
-	$(CPP) $(OPTIM) -o $@ $^ -lbenchmark -lpthread
+	@ $(CPP) $(OPTIM) -o $@ $^ -lbenchmark -lpthread
 else
 	@ echo libbenchmark not installed
 endif

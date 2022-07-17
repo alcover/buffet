@@ -1,6 +1,6 @@
 /*
 Buffet - All-inclusive Buffer for C
-Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
+Copyright (C) 2022 - Francois Alcover <francois|at|alcover|dot|fr>
 */
 
 #include <stdio.h>
@@ -30,8 +30,7 @@ typedef struct {
 #define STOREMEM(cap) (DATAOFF+(cap)+1) // alloc for store of capacity `cap`
 
 #define ERR_ALLOC ERR("Failed allocation\n")
-#define WARN_CANARY WARN("Bad canary. Double free ?\n")
-#define WARN_REFCNT WARN("Bad refcnt. Alias ?\n")
+#define WARN_CANARY WARN("bad canary, double free ?\n")
 
 static inline char*
 getdata (const Buffet *buf, Tag tag) {
@@ -49,7 +48,7 @@ getstore (const Buffet *buf) {
 }
 
 static inline Store*
-newstore (size_t cap, size_t len)
+new_store (size_t cap, size_t len)
 {
     Store *store = malloc(STOREMEM(cap));
     if (!store) {ERR_ALLOC; return NULL;}
@@ -65,7 +64,7 @@ newstore (size_t cap, size_t len)
 }
 
 static inline Buffet
-newvue (const char *src, size_t len)
+new_vue (const char *src, size_t len)
 {
     return (Buffet) {
         .ptr.data = (char*)src,
@@ -76,14 +75,14 @@ newvue (const char *src, size_t len)
 
 // view on SSO
 static inline Buffet
-newssovue (Buffet *src, size_t len, size_t off)
+new_ssovue (Buffet *src, size_t len, size_t off)
 {
-    if (src->sso.refcnt >= SSO_MAXREF) {
+    if (src->sso.rfc >= SSO_MAXREF) {
         ERR("reached max views on SSO.\n");
         return ZERO;
     }
 
-    ++ src->sso.refcnt;
+    ++ src->sso.rfc;
 
     return (Buffet) {
         .ptr.data = (char*)src->sso.data + off,
@@ -96,7 +95,7 @@ newssovue (Buffet *src, size_t len, size_t off)
 static void 
 dbgstore (const Store *store) 
 {
-    printf("store: cap:%zu refcnt:%d data:\"%.*s\"", 
+    printf("cap:%zu refcnt:%d data:\"%.*s\"\n", 
         store->cap, store->refcnt, (int)(store->len +1), store->data);
     fflush(stdout);
 }
@@ -115,8 +114,10 @@ dbg (const Buffet* buf)
     char *data = getdata(buf,tag);
     size_t len = getlen(buf,tag);
     
-    printf("%s %zu \"%.*s\"", stag, len, (int)len, data);
+    printf("%s %zu \"%.*s\"\n", stag, len, (int)len, data);
     fflush(stdout);
+
+    if (tag==OWN) dbgstore(getstore(buf));
 }
 
 //============================================================================
@@ -133,7 +134,7 @@ bft_new (size_t cap)
     Buffet ret = ZERO;
 
     if (cap > BUFFET_SSOMAX) {
-        Store *store = newstore(cap, 0);
+        Store *store = new_store(cap, 0);
         if (store) {
             return (Buffet) {
                 .ptr.data = store->data,
@@ -161,7 +162,7 @@ bft_memcopy (const char *src, size_t len)
         memcpy(ret.sso.data, src, len);
         ret.sso.len = len;
     } else {
-        Store *store = newstore(len, len);
+        Store *store = new_store(len, len);
         if (store) {
             char *data = store->data;
             memcpy(data, src, len);
@@ -185,7 +186,7 @@ bft_memcopy (const char *src, size_t len)
  */
 Buffet
 bft_memview (const char *src, size_t len) {
-    return newvue(src, len);
+    return new_vue(src, len);
 }
 
 /**
@@ -228,16 +229,20 @@ Buffet
 bft_dup (const Buffet *src)
 {
     Tag tag = TAG(src);
-    Buffet ret = *src;
 
     switch(tag) {
         
-        case SSO:
-            ret.sso.refcnt = 0;
-            break;
+        case SSO: {
+            Buffet ret = *src;
+            ret.sso.rfc = 0;
+            return ret;
+        }
 
         case OWN: {
-            Store *store = getstore(src); //check?
+            Store *store = getstore(src);
+            #if MEMCHECK
+                if (store->canary != CANARY) {WARN_CANARY; return ZERO;}
+            #endif
             ++ store->refcnt;
             break;
         }
@@ -247,12 +252,12 @@ bft_dup (const Buffet *src)
 
         case SSV: {
             BuffetSSO *target = (BuffetSSO*)(src->ptr.data - src->ptr.off);
-            ++ target->refcnt;
+            ++ target->rfc;
             break;
         }
     }
 
-    return ret;
+    return *src;
 }
 
 /**
@@ -274,25 +279,23 @@ bft_view (Buffet *src, size_t off, size_t len)
     switch(tag) {
 
         case SSO: 
-            return newssovue(src, len, off);
+            return new_ssovue(src, len, off);
 
         case VUE:
             // sub-vue on src's target
-            return newvue(src->ptr.data + off, len);
+            return new_vue(src->ptr.data + off, len);
 
         case SSV: {
             size_t vueoff = src->ptr.off;
             Buffet *target = (Buffet*)(src->ptr.data - vueoff);
-            return newssovue(target, len, vueoff+off);
+            return new_ssovue(target, len, vueoff+off);
         }
 
         case OWN: {
             Store *store = getstore(src);
-
-            if (store->canary != CANARY) {
-                WARN_CANARY;
-                return ZERO;
-            }
+            #if MEMCHECK
+                if (store->canary != CANARY) {WARN_CANARY; return ZERO;}
+            #endif
 
             ++ store->refcnt; 
 
@@ -322,32 +325,35 @@ bft_free (Buffet *buf)
 {   
     Tag tag = TAG(buf);
 
-    if (tag==SSO && buf->sso.refcnt) {
+    if (tag==SSO && buf->sso.rfc) {
         
-        WARN("bft_free: SSO has views on it\n");
+        WARN("SSO has views on it\n");
         return;
     
     } else if (tag==OWN) {
             
         Store *store = getstore(buf);
-        if (store->canary != CANARY) {
-            WARN_CANARY;
-        } else if (!store->refcnt) {
-            WARN_REFCNT;
-        } else {
-            -- store->refcnt;
-            if (!store->refcnt) {
-                store->canary = 0;
-                // LOG("free store");
-                free(store);
-            } 
+        #if MEMCHECK
+            if (store->canary != CANARY) {
+                WARN_CANARY; 
+                *buf = ZERO;
+                return;
+            }
+        #endif
+
+        -- store->refcnt;
+
+        if (!store->refcnt) {
+            store->canary = 0;
+            LOG("free store");
+            free(store);
         }
 
     } else if (tag==SSV) {
         // check ? No, fault would be user losing scope
         // plus SSO has no canary..
         BuffetSSO *target = (BuffetSSO*)(buf->ptr.data - buf->ptr.off);
-        -- target->refcnt;
+        -- target->rfc;
     }
 
     // memset(buf, 0, sizeof(Buffet));
@@ -370,6 +376,7 @@ bft_free (Buffet *buf)
  * @param[in] src the byte array source
  * @param[in] srclen the source array length
  * @param[out] dst the destination Buffet
+ * @return total length or zero on error
 */
 size_t
 bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
@@ -398,7 +405,7 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
             memcpy(out.sso.data + curlen, src, srclen);
             out.sso.data[newlen] = 0;
             out.sso.len = newlen;
-            out.sso.refcnt = 0;
+            out.sso.rfc = 0;
             *dst = out;
             return newlen;
         }
@@ -417,6 +424,14 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
         if (tag == OWN) {
 
             store = getstore(buf);
+            #if MEMCHECK
+                if (store->canary != CANARY) {
+                    WARN_CANARY;
+                    *dst = bft_memcopy(src, srclen);
+                    return srclen;
+                }
+            #endif
+
             bool alone = store->refcnt < 2;
 
             // in-place optimization:
@@ -449,7 +464,7 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
         // assert(tag!=SSO);
         LOG("ssofit");
         *dst = (Buffet){
-            .sso.refcnt = 0,
+            .sso.rfc = 0,
             .sso.len = newlen,
             .sso.tag = SSO
         };
@@ -463,7 +478,7 @@ bft_cat (Buffet *dst, const Buffet *buf, const char *src, size_t srclen)
         return newlen;
     }
 
-    store = newstore(OVERALLOC*newlen, newlen);
+    store = new_store(OVERALLOC*newlen, newlen);
     
     if (!store) {
         *dst = ZERO; //?
@@ -525,7 +540,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
             buf->sso.len = newlen;
             return newlen;
         
-        } else if (buf->sso.refcnt) {
+        } else if (buf->sso.rfc) {
             // Relocation would mutate `buf` to OWN
             // while views still point directly into it.
             WARN("Append would invalidate views on SSO\n");
@@ -543,10 +558,19 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
         if (tag == OWN) {
 
             store = getstore(buf);
+            #if MEMCHECK
+                if (store->canary != CANARY) {
+                    WARN_CANARY;
+                    // return 0;
+                    *buf = bft_memcopy(src, srclen);
+                    return srclen;
+                }
+            #endif
+
             bool alone = store->refcnt < 2;
 
             // append in-place: only if store has room
-            // and `buf` is unique owner or at end.
+            // and (`buf` is unique owner or at end).
             if ((writeoff+srclen <= store->cap)
                 && (alone || writeoff == store->len)) {
 
@@ -558,12 +582,11 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
                 buf->ptr.len = newlen;
 
                 return newlen;
-            }
             
             // realloc store
-            // optim: shift left if off=0 ?
-            if (alone) {
-                //LOG("append OWN: realloc");
+            } else if (alone) {
+                // optim: shift left if off=0 ?
+                LOG("append OWN: realloc");
                 size_t newcap = writeoff + OVERALLOC*srclen;
                 store = realloc(store, STOREMEM(newcap));
                 if (!store) {
@@ -572,16 +595,20 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
                 }
                 writer = store->data + writeoff;
                 goto appn;
+            
+            // detach
+            } else {
+                LOG("detach");
+                assert(store->refcnt);
+                -- store->refcnt; // check ?
+                // todo: way to adjust end*
             }
 
-            // detach
-            -- store->refcnt; 
-            // rem: without list of views, no way to adjust end*
         
         } else if (tag==SSV) {
 
             BuffetSSO *target = (BuffetSSO*)(buf->ptr.data - buf->ptr.off);
-            bool alone = target->refcnt < 2;
+            bool alone = target->rfc < 2;
             
             // overdone ?
             // Append in-place: only if sso has room
@@ -599,7 +626,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
             }
 
             // detach
-            -- target->refcnt;
+            -- target->rfc;
         }
     } // end case ptr
 
@@ -609,7 +636,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
         // LOG("ssofit");
         TAG(buf) = SSO;
         buf->sso.len = newlen;
-        buf->sso.refcnt = 0;
+        buf->sso.rfc = 0;
 
         writer = buf->sso.data;
         memcpy(writer, curdata, curlen);
@@ -620,7 +647,7 @@ bft_append (Buffet *buf, const char *src, size_t srclen)
         return newlen;
     }
 
-    store = newstore(OVERALLOC*newlen, newlen);
+    store = new_store(OVERALLOC*newlen, newlen);
     if (!store) {return 0;}
 
     writer = store->data;
@@ -687,13 +714,13 @@ bft_split (const char* src, size_t srclen, const char* sep, size_t seplen,
             }
         }
 
-        parts[curcnt++] = newvue(beg, end-beg);
+        parts[curcnt++] = new_vue(beg, end-beg);
         beg = end+seplen;
         end = beg;
     };
     
     // last part
-    parts[curcnt++] = newvue(beg, src+srclen-beg);
+    parts[curcnt++] = new_vue(beg, src+srclen-beg);
 
     if (local) {
         size_t outlen = curcnt * sizeof(Buffet);
@@ -902,6 +929,10 @@ bft_cap (const Buffet* buf) {
     if (tag==SSO) return BUFFET_SSOMAX;
     if (tag==OWN) {
         Store* store = getstore(buf);
+        #if MEMCHECK
+            if (store->canary != CANARY) {WARN_CANARY; return 0;}
+        #endif
+
         return store->cap;
     }
     return 0;

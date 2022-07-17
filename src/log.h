@@ -20,7 +20,7 @@
 #else
 
 #define WARN(args...) do { \
-    fprintf(stderr,"WARN line:%d ",__LINE__);  \
+    fprintf(stderr,"WARN %s:%d ", __func__, __LINE__);  \
     fprintf(stderr,args); \
 } while(0)
 

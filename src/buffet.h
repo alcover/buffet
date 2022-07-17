@@ -1,6 +1,6 @@
 /*
 Buffet - All-inclusive Buffer for C
-Copyright (C) 2022 - Francois Alcover <francois [on] alcover [dot] fr>
+Copyright (C) 2022 - Francois Alcover <francois|at|alcover|dot|fr>
 */
 
 #ifndef BUFFET_H
@@ -30,7 +30,7 @@ typedef struct {
 // tag=SSO : small string embedding
 typedef struct {
     char    data[sizeof(BuffetPtr)-2];
-    uint8_t refcnt;
+    uint8_t rfc; // refcount
     uint8_t len:8-TAGBITS, tag:TAGBITS;
 } BuffetSSO;
 
@@ -57,7 +57,7 @@ extern "C" {
 Buffet  bft_new (size_t cap);
 Buffet  bft_memcopy (const char *src, size_t len);
 Buffet  bft_memview (const char *src, size_t len);
-Buffet  bft_dup (const Buffet *src);
+Buffet  bft_dup  (const Buffet *src);
 Buffet  bft_copy (const Buffet *src, size_t off, size_t len);
 Buffet  bft_copyall (const Buffet *src);
 Buffet  bft_view (Buffet *src, size_t off, size_t len);
@@ -74,9 +74,12 @@ Buffet* bft_splitstr (const char *src, const char *sep, int *outcnt);
 int     bft_cmp (const Buffet *a, const Buffet *b);
 size_t  bft_cap (const Buffet *buf);
 size_t  bft_len (const Buffet *buf);
-const char* bft_data (const Buffet *buf);
-const char* bft_cstr (const Buffet *buf, bool *mustfree);
-char*       bft_export (const Buffet *buf);
+
+const char* 
+        bft_data (const Buffet *buf);
+const char* 
+        bft_cstr (const Buffet *buf, bool *mustfree);
+char*   bft_export (const Buffet *buf);
 
 void    bft_print (const Buffet *buf);
 void    bft_dbg (const Buffet *buf);
