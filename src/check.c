@@ -410,7 +410,7 @@ void uapn(Buffet *buf, size_t buflen, size_t len) {
     Buffet alias = ref; \
     bft_append (&alias, alpha, 8); /*detach refc==1*/ \
     bft_append (&ref, alpha+16, 16); /*refc==0*/ \
-    bft_dbg(&buf); \
+    /*bft_dbg(&buf);*/ \
     bft_free(&buf); \
     bft_free(&ref); \
 }

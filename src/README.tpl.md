@@ -114,10 +114,12 @@ bft_free(alias) // OK. Possible warning "Bad canary. Double free ?"
 To this end, operations like *view()* or *free()* may check the store's header.  
 If wrong, the operation aborts and returns an empty buffet.  
 
-Checks are enabled by #defining MEMCHECKS or building with  
-    MEMCHECKS=1 make
+Checks are enabled by `#define MEMCHECK` or building with  
 
-Warnings are enabled by #defining DEBUG or building with  
+    MEMCHECK=1 make
+
+Warnings are enabled by `#define DEBUG` or building with  
+
     DEBUG=1 make
 
 NB: Even with checks, some aliasing can be fatal.  
@@ -143,31 +145,31 @@ NB: The lib is not much optimized and the bench maybe amateurish.
 
 On a weak Core i3 :  
 <pre>
-MEMVIEW_cpp/8                1 ns          1 ns 1000000000
-MEMVIEW_buffet/8             7 ns          7 ns  103101477
-MEMCOPY_c/8                 17 ns         17 ns   41771438
-MEMCOPY_buffet/8            12 ns         12 ns   59136008
-MEMCOPY_c/32                16 ns         16 ns   44280093
-MEMCOPY_buffet/32           27 ns         27 ns   25569904
-MEMCOPY_c/128               17 ns         17 ns   41047431
-MEMCOPY_buffet/128          31 ns         31 ns   22837310
-MEMCOPY_c/512               28 ns         28 ns   25499520
-MEMCOPY_buffet/512          45 ns         45 ns   15477668
-MEMCOPY_c/2048              94 ns         94 ns    7401330
-MEMCOPY_buffet/2048        110 ns        110 ns    6405395
-MEMCOPY_c/8192             199 ns        199 ns    3509839
-MEMCOPY_buffet/8192        284 ns        284 ns    2461398
-APPEND_cpp/8/4              12 ns         12 ns   57633324
-APPEND_buffet/8/4           22 ns         22 ns   32506683
-APPEND_cpp/8/16             32 ns         32 ns   21765849
-APPEND_buffet/8/16          30 ns         30 ns   23278437
-APPEND_cpp/24/4             48 ns         48 ns   14586050
-APPEND_buffet/24/4          31 ns         31 ns   22807349
-APPEND_cpp/24/32            47 ns         47 ns   14982967
-APPEND_buffet/24/32         29 ns         29 ns   24023279
-SPLITJOIN_c               2913 ns       2913 ns     240557
-SPLITJOIN_cpp             3128 ns       3128 ns     223070
-SPLITJOIN_buffet          1431 ns       1431 ns     487453
+MEMVIEW_cpp/8            0.609 ns
+MEMVIEW_buffet/8          6.36 ns
+MEMCOPY_c/8               16.7 ns
+MEMCOPY_buffet/8          11.9 ns
+MEMCOPY_c/32              15.3 ns
+MEMCOPY_buffet/32         26.3 ns
+MEMCOPY_c/128             16.8 ns
+MEMCOPY_buffet/128        29.8 ns
+MEMCOPY_c/512             24.9 ns
+MEMCOPY_buffet/512        39.3 ns
+MEMCOPY_c/2048            94.1 ns
+MEMCOPY_buffet/2048        109 ns
+MEMCOPY_c/8192             196 ns
+MEMCOPY_buffet/8192        282 ns
+APPEND_cpp/8/4            10.9 ns
+APPEND_buffet/8/4         16.3 ns
+APPEND_cpp/8/16           36.5 ns
+APPEND_buffet/8/16        30.2 ns
+APPEND_cpp/24/4           49.0 ns
+APPEND_buffet/24/4        30.1 ns
+APPEND_cpp/24/32          48.1 ns
+APPEND_buffet/24/32       28.8 ns
+SPLITJOIN_c               2782 ns
+SPLITJOIN_cpp             3317 ns
+SPLITJOIN_buffet          1397 ns
 </pre>
 
 
@@ -179,7 +181,7 @@ SPLITJOIN_buffet          1431 ns       1431 ns     487453
 [bft_copy](#bft_copy)  
 [bft_copyall](#bft_copyall)  
 [bft_view](#bft_view)  
-[bft_dup](#bft_dup)  (don't alias buffets, use this)  
+[bft_dup](#bft_dup)  (**don't alias buffets**, use this)  
 [bft_append](#bft_append)  
 [bft_split](#bft_split)  
 [bft_splitstr](#bft_splitstr)  
